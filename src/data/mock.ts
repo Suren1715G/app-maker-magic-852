@@ -1,5 +1,7 @@
 export type CallStatus = "booked" | "answered" | "missed-followup";
 
+export type CallTag = "lead" | "booked" | "spam" | "follow-up";
+
 export type Call = {
   id: string;
   caller: string;
@@ -10,6 +12,8 @@ export type Call = {
   summary: string;
   transcript: { speaker: "AI" | "Caller"; text: string; at: string }[];
   bookingId?: string;
+  tag?: CallTag;
+  recordingUrl?: string;
 };
 
 export type Booking = {
@@ -49,6 +53,8 @@ export const calls: Call[] = [
     status: "booked",
     summary: "Booked a deep clean for Friday 2:00 PM. Confirmed address and pricing.",
     bookingId: "b1",
+    tag: "booked",
+    recordingUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
     transcript: [
       { speaker: "AI", text: "Hi, you've reached SGS. How can I help today?", at: iso(-22) },
       { speaker: "Caller", text: "I need a deep cleaning for my apartment.", at: iso(-22) },
@@ -66,6 +72,8 @@ export const calls: Call[] = [
     durationSec: 98,
     status: "answered",
     summary: "Asked about pricing for weekly service. Quoted $120/visit. Will call back.",
+    tag: "lead",
+    recordingUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
     transcript: [
       { speaker: "AI", text: "SGS, how can I help?", at: iso(-58) },
       { speaker: "Caller", text: "What do you charge for weekly cleaning?", at: iso(-58) },
@@ -82,6 +90,8 @@ export const calls: Call[] = [
     status: "booked",
     summary: "Booked move-out clean for next Tuesday 9:00 AM. 2BR apartment.",
     bookingId: "b2",
+    tag: "booked",
+    recordingUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
     transcript: [
       { speaker: "AI", text: "Hi, this is SGS. How can I help?", at: iso(-95) },
       { speaker: "Caller", text: "I'm moving out and need a deep clean.", at: iso(-95) },
@@ -98,6 +108,8 @@ export const calls: Call[] = [
     durationSec: 76,
     status: "answered",
     summary: "Reschedule request for Thursday's appointment. Moved to 4 PM.",
+    tag: "follow-up",
+    recordingUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
     transcript: [
       { speaker: "AI", text: "SGS, how can I help?", at: iso(-180) },
       { speaker: "Caller", text: "Can I move my Thursday appointment later?", at: iso(-180) },
@@ -112,6 +124,7 @@ export const calls: Call[] = [
     durationSec: 12,
     status: "missed-followup",
     summary: "Caller hung up before booking. Follow-up SMS sent automatically.",
+    tag: "spam",
     transcript: [
       { speaker: "AI", text: "SGS, how can I help?", at: iso(-260) },
       { speaker: "Caller", text: "...", at: iso(-260) },
