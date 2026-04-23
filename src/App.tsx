@@ -5,13 +5,16 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/app/ProtectedRoute";
+import { AdminRoute } from "@/components/app/AdminRoute";
 import Auth from "./pages/auth/Auth";
+import ClaimCode from "./pages/auth/ClaimCode";
 import Home from "./pages/app/Home";
 import Calls from "./pages/app/Calls";
 import CallDetail from "./pages/app/CallDetail";
 import Calendar from "./pages/app/Calendar";
 import Sms from "./pages/app/Sms";
 import Settings from "./pages/app/Settings";
+import Admin from "./pages/app/Admin";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -25,6 +28,8 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/claim" element={<ClaimCode />} />
+            <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
             <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
             <Route path="/calls" element={<ProtectedRoute><Calls /></ProtectedRoute>} />
             <Route path="/calls/:id" element={<ProtectedRoute><CallDetail /></ProtectedRoute>} />
