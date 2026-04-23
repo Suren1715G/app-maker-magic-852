@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { notifications, type AppNotification } from "@/data/mock";
+import { notifications as mockNotifications, type AppNotification } from "@/data/mock";
 import { fmtRel } from "@/lib/format";
 import { Bell, CalendarDays, PhoneMissed, Star, BarChart3, Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 
 const iconFor = (t: AppNotification["type"]) =>
   t === "lead" ? Bell : t === "booking" ? CalendarDays : t === "missed" ? PhoneMissed : t === "review" ? Star : BarChart3;
@@ -16,7 +17,8 @@ const toneFor = (t: AppNotification["type"]) =>
   t === "review" ? "text-accent bg-accent/15" : "text-muted-foreground bg-muted";
 
 const Notifications = () => {
-  const [items, setItems] = useState(notifications);
+  const isNew = useIsNewCustomer();
+  const [items, setItems] = useState<AppNotification[]>(isNew ? [] : mockNotifications);
   const [prefs, setPrefs] = useState({ push: true, email: true, dailySummary: true, missedCall: true, newReview: false });
 
   const markAll = () => setItems((p) => p.map((n) => ({ ...n, read: true })));

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { bookings, type Booking } from "@/data/mock";
+import { bookings as mockBookings, type Booking } from "@/data/mock";
 import { fmtTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ChevronLeft, ChevronRight, Clock, MoreVertical, CalendarX, UserX, CalendarClock, Link2 } from "lucide-react";
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 
 type View = "month" | "week" | "day";
 
@@ -51,11 +52,12 @@ const fmtBookingLabel = (b: Booking) =>
   })}`;
 
 const Calendar = () => {
+  const isNew = useIsNewCustomer();
   const today = new Date();
   const [cursor, setCursor] = useState<Date>(startOfDay(today));
   const [view, setView] = useState<View>("month");
   const [selected, setSelected] = useState<Date>(startOfDay(today));
-  const [items, setItems] = useState<Booking[]>(bookings);
+  const [items, setItems] = useState<Booking[]>(isNew ? [] : mockBookings);
   const [scope, setScope] = useState<"upcoming" | "past" | "all">("all");
 
   const filtered = useMemo(() => {

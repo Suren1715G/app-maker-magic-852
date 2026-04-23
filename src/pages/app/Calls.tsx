@@ -1,11 +1,12 @@
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { calls, type CallTag } from "@/data/mock";
+import { calls as mockCalls, type CallTag } from "@/data/mock";
 import { fmtDuration, fmtRel } from "@/lib/format";
 import { Link } from "react-router-dom";
 import { CheckCircle2, PhoneIncoming, PhoneMissed } from "lucide-react";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { StatCard } from "@/components/app/StatCard";
+import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 
 const filters = [
   { id: "all", label: "All" },
@@ -36,6 +37,8 @@ const ranges = [
 ] as const;
 
 const Calls = () => {
+  const isNew = useIsNewCustomer();
+  const calls = isNew ? [] : mockCalls;
   const [filter, setFilter] = useState<(typeof filters)[number]["id"]>("all");
   const [tag, setTag] = useState<"any" | CallTag>("any");
   const [range, setRange] = useState<(typeof ranges)[number]["id"]>("all");
@@ -48,7 +51,7 @@ const Calls = () => {
       .filter((c) => filter === "all" || c.status === filter)
       .filter((c) => tag === "any" || c.tag === tag)
       .filter((c) => cutoff === Infinity || (now - +new Date(c.startedAt)) / 36e5 <= cutoff);
-  }, [filter, tag, range]);
+  }, [filter, tag, range, calls]);
 
   const total = calls.length;
   const answered = calls.filter((c) => c.status !== "missed-followup").length;

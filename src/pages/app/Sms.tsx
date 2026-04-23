@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { threads as initialThreads, type SmsThread } from "@/data/mock";
+import { threads as mockThreads, type SmsThread } from "@/data/mock";
 import { fmtRel } from "@/lib/format";
 import { Flag, Send, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 
 const Sms = () => {
-  const [threads, setThreads] = useState<SmsThread[]>(initialThreads);
+  const isNew = useIsNewCustomer();
+  const [threads, setThreads] = useState<SmsThread[]>(isNew ? [] : mockThreads);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 

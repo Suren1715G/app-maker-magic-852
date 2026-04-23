@@ -1,11 +1,12 @@
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { weeklySeries, heatmap, stats } from "@/data/mock";
+import { weeklySeries as mockWeeklySeries, heatmap as mockHeatmap, stats as mockStats } from "@/data/mock";
 import { fmtMoney } from "@/lib/format";
 import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Download, TrendingUp, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 
 const ranges = [
   { id: "7d", label: "7 days" },
@@ -14,11 +15,19 @@ const ranges = [
 ] as const;
 
 const Analytics = () => {
+  const isNew = useIsNewCustomer();
+  const weeklySeries = isNew
+    ? mockWeeklySeries.map((d) => ({ ...d, calls: 0, bookings: 0, revenue: 0 }))
+    : mockWeeklySeries;
+  const heatmap = isNew
+    ? mockHeatmap.map((row) => ({ ...row, hours: row.hours.map(() => 0) }))
+    : mockHeatmap;
+  const stats = isNew ? { ...mockStats, minutesSaved: 0 } : mockStats;
   const [range, setRange] = useState<(typeof ranges)[number]["id"]>("7d");
   const totalCalls = weeklySeries.reduce((a, b) => a + b.calls, 0);
   const totalBookings = weeklySeries.reduce((a, b) => a + b.bookings, 0);
   const totalRevenue = weeklySeries.reduce((a, b) => a + b.revenue, 0);
-  const conv = Math.round((totalBookings / totalCalls) * 100);
+  const conv = totalCalls > 0 ? Math.round((totalBookings / totalCalls) * 100) : 0;
 
   const exportPdf = () => {
     const w = window.open("", "_blank");
@@ -54,7 +63,7 @@ const Analytics = () => {
     w.document.close();
   };
 
-  const max = Math.max(...heatmap.flatMap((d) => d.hours));
+  const max = Math.max(1, ...heatmap.flatMap((d) => d.hours));
 
   return (
     <AppShell>
@@ -85,7 +94,7 @@ const Analytics = () => {
 
       <div className="grid grid-cols-2 gap-3 mb-5">
         <Stat label="Calls" value={totalCalls} delta="+18% MoM" />
-        <Stat label="Bookings" value={totalBookings} delta={`${conv}% conv.`} />
+        <Stat label="Bookings" value={totalBookings} delta={totalCalls > 0 ? `${conv}% conv.` : "—"} />
         <Stat label="Revenue" value={fmtMoney(totalRevenue)} delta="+22% MoM" />
         <Stat label="Uptime" value="99.8%" delta="this month" />
       </div>
