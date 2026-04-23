@@ -12,8 +12,21 @@ const Home = () => {
   const unread = notifications.filter((n) => !n.read).length;
   const hoursSaved = (stats.minutesSaved / 60).toFixed(1);
 
+  const homeSummary =
+    `Home dashboard — calls today ${stats.callsToday}, bookings today ${stats.bookingsToday}, ` +
+    `revenue booked today ${fmtMoney(stats.revenueBookedToday)}, conversion rate ${Math.round(stats.conversionRate * 100)}%, ` +
+    `new leads in pipeline ${newLeads}, SMS sent ${stats.smsSent}, hours saved this week ${hoursSaved}, ` +
+    `unread notifications ${unread}.` +
+    (next
+      ? ` Next booking: ${next.customer}, ${next.service}, ${new Date(next.startsAt).toLocaleString(undefined, {
+          weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit",
+        })}, ${next.durationMin} minutes.`
+      : " No upcoming bookings.");
+
   return (
     <AppShell>
+      <p className="sr-only" aria-label={homeSummary}>{homeSummary}</p>
+
       <header className="pt-4 pb-6">
         <span className="text-muted-foreground text-sm block">Welcome back</span>
         <h1 className="font-display text-4xl font-semibold leading-none mt-1">
@@ -53,31 +66,18 @@ const Home = () => {
       </Link>
 
       <div className="grid grid-cols-2 gap-3 mb-8">
-        <StatCard
-          label="Calls today"
-          value={stats.callsToday}
-          hint={`${Math.round(stats.conversionRate * 100)}% booked`}
-          icon={<Phone className="h-4 w-4" />}
-          accent
-        />
-        <StatCard
-          label="Bookings"
-          value={stats.bookingsToday}
-          hint={fmtMoney(stats.revenueBookedToday) + " booked"}
-          icon={<CalendarDays className="h-4 w-4" />}
-        />
-        <StatCard
-          label="New leads"
-          value={newLeads}
-          hint="In your pipeline"
-          icon={<Users className="h-4 w-4" />}
-        />
-        <StatCard
-          label="SMS sent"
-          value={stats.smsSent}
-          hint="Confirmations & replies"
-          icon={<Sparkles className="h-4 w-4" />}
-        />
+        <div aria-label={`Calls today: ${stats.callsToday}. ${Math.round(stats.conversionRate * 100)} percent booked.`}>
+          <StatCard label="Calls today" value={stats.callsToday} hint={`${Math.round(stats.conversionRate * 100)}% booked`} icon={<Phone className="h-4 w-4" />} accent />
+        </div>
+        <div aria-label={`Bookings today: ${stats.bookingsToday}. Revenue booked ${fmtMoney(stats.revenueBookedToday)}.`}>
+          <StatCard label="Bookings" value={stats.bookingsToday} hint={fmtMoney(stats.revenueBookedToday) + " booked"} icon={<CalendarDays className="h-4 w-4" />} />
+        </div>
+        <div aria-label={`New leads in pipeline: ${newLeads}.`}>
+          <StatCard label="New leads" value={newLeads} hint="In your pipeline" icon={<Users className="h-4 w-4" />} />
+        </div>
+        <div aria-label={`SMS sent: ${stats.smsSent}. Confirmations and replies.`}>
+          <StatCard label="SMS sent" value={stats.smsSent} hint="Confirmations & replies" icon={<Sparkles className="h-4 w-4" />} />
+        </div>
       </div>
 
       {next && (
@@ -106,7 +106,10 @@ const Home = () => {
         <SectionTitle title="Recent calls" to="/calls" />
         <ul className="space-y-2">
           {recent.map((c) => (
-            <li key={c.id}>
+            <li
+              key={c.id}
+              aria-label={`Recent call: ${c.caller}, status ${c.status}, started ${new Date(c.startedAt).toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}. Summary: ${c.summary}`}
+            >
               <Link
                 to={`/calls/${c.id}`}
                 className="glass rounded-2xl p-4 flex items-center gap-3 hover:bg-secondary/40 transition-colors"

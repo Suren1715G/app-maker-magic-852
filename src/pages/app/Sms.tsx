@@ -94,11 +94,26 @@ const Sms = () => {
   return (
     <AppShell>
       <PageHeader title="Messages" subtitle="Two-way conversations the AI handled." />
+      {(() => {
+        const totalThreads = threads.length;
+        const totalUnread = threads.reduce((a, t) => a + t.unread, 0);
+        const flagged = threads.filter((t) => t.flagged).length;
+        const summary =
+          `Messages overview — ${totalThreads} thread${totalThreads === 1 ? "" : "s"}, ` +
+          `${totalUnread} unread message${totalUnread === 1 ? "" : "s"}, ${flagged} flagged.`;
+        return <p className="sr-only" aria-label={summary}>{summary}</p>;
+      })()}
       <ul className="space-y-2">
         {threads.map((t) => {
           const last = t.messages[t.messages.length - 1];
+          const threadLabel =
+            `Thread with ${t.customer} (${t.phone}). ` +
+            `${t.messages.length} message${t.messages.length === 1 ? "" : "s"} total, ` +
+            `${t.unread} unread${t.flagged ? ", flagged" : ""}. ` +
+            `Last message ${last.from === "ai" ? "from you" : "from them"} ` +
+            `${new Date(last.at).toLocaleString(undefined, { weekday: "long", hour: "numeric", minute: "2-digit" })}: ${last.body}`;
           return (
-            <li key={t.id}>
+            <li key={t.id} aria-label={threadLabel}>
               <button
                 onClick={() => open(t.id)}
                 className="w-full text-left glass rounded-2xl p-4 flex items-center gap-3 hover:bg-secondary/40 transition-colors"
