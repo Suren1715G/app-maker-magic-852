@@ -4,6 +4,7 @@ import { DemoBanner } from "./DemoBanner";
 import { useDemoMode } from "@/contexts/DemoModeContext";
 import { LocationSwitcher } from "./LocationSwitcher";
 import { WifiOff } from "lucide-react";
+import { CubesBackground } from "./CubesBackground";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { demoMode } = useDemoMode();
@@ -22,6 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen w-full max-w-md md:max-w-3xl lg:max-w-5xl mx-auto relative">
+      <CubesBackground />
       <DemoBanner />
       {!online && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-accent text-accent-foreground text-[11px] font-medium">
