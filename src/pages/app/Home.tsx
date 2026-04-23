@@ -1,47 +1,21 @@
-import { AppShell, PageHeader } from "@/components/app/AppShell";
+import { AppShell } from "@/components/app/AppShell";
 import { StatCard } from "@/components/app/StatCard";
-import { calls, bookings, stats, leads, notifications } from "@/data/mock";
+import { calls as mockCalls, bookings as mockBookings, stats as mockStats, leads as mockLeads, notifications as mockNotifications } from "@/data/mock";
 import { fmtDay, fmtMoney, fmtRel, fmtTime } from "@/lib/format";
 import { Link } from "react-router-dom";
-import { ArrowRight, CalendarDays, Phone, Sparkles, Clock, Users, PhoneIncoming } from "lucide-react";
-import { useDemoMode } from "@/contexts/DemoModeContext";
-import { useLocationCtx } from "@/contexts/LocationContext";
+import { ArrowRight, CalendarDays, Phone, Sparkles, Clock, Users } from "lucide-react";
+import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 
 const Home = () => {
-  const { demoMode } = useDemoMode();
-  const { list: locationList } = useLocationCtx();
-  // A "new customer" is a real (non-demo) user with no locations set up yet.
-  const isNewCustomer = !demoMode && locationList.length === 0;
+  const isNew = useIsNewCustomer();
 
-  if (isNewCustomer) {
-    return (
-      <AppShell>
-        <header className="pt-4 pb-6">
-          <span className="text-muted-foreground text-sm block">Welcome</span>
-          <h1 className="font-display text-4xl font-semibold leading-none mt-1">
-            <span className="prism-text">SGS</span>
-          </h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            Add your first location to start receiving calls.
-          </p>
-        </header>
-
-        <div className="glass rounded-2xl p-6 text-center">
-          <span className="mx-auto mb-4 h-14 w-14 rounded-full bg-primary/15 text-primary flex items-center justify-center">
-            <PhoneIncoming className="h-6 w-6" />
-          </span>
-          <div className="font-display text-lg font-semibold mb-1">No data yet</div>
-          <p className="text-sm text-muted-foreground mb-4">
-            Once your AI receptionist starts answering calls, you'll see your stats,
-            bookings and leads here.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Tap <span className="font-medium">Add location</span> in the top‑right to get started.
-          </p>
-        </div>
-      </AppShell>
-    );
-  }
+  const calls = isNew ? [] : mockCalls;
+  const bookings = isNew ? [] : mockBookings;
+  const leads = isNew ? [] : mockLeads;
+  const notifications = isNew ? [] : mockNotifications;
+  const stats = isNew
+    ? { callsToday: 0, bookingsToday: 0, conversionRate: 0, smsSent: 0, minutesSaved: 0, revenueBookedToday: 0 }
+    : mockStats;
 
   const recent = [...calls].sort((a, b) => +new Date(b.startedAt) - +new Date(a.startedAt)).slice(0, 3);
   const next = [...bookings].sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt))[0];
@@ -79,7 +53,7 @@ const Home = () => {
         </span>
         <div className="flex-1">
           <div className="text-sm font-medium">Answering calls now</div>
-          <div className="text-xs text-muted-foreground">{stats.callsToday} calls today · avg 1m 38s</div>
+          <div className="text-xs text-muted-foreground">{stats.callsToday} calls today · avg {isNew ? "—" : "1m 38s"}</div>
         </div>
         {unread > 0 && (
           <Link to="/notifications" className="text-[10px] px-2 py-1 rounded-full bg-primary/20 text-primary font-semibold">
@@ -96,28 +70,24 @@ const Home = () => {
           <Clock className="h-5 w-5" />
         </span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold">Your AI saved you {hoursSaved} hours this week</div>
-          <div className="text-xs text-muted-foreground">≈ {fmtMoney(Number(hoursSaved) * 35)} in receptionist time</div>
+          <div className="text-sm font-semibold">
+            {isNew ? "No hours saved yet" : `Your AI saved you ${hoursSaved} hours this week`}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {isNew ? "Stats will appear once calls come in" : `≈ ${fmtMoney(Number(hoursSaved) * 35)} in receptionist time`}
+          </div>
         </div>
         <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
       </Link>
 
       <div className="grid grid-cols-2 gap-3 mb-8">
-        <div aria-label={`Calls today: ${stats.callsToday}. ${Math.round(stats.conversionRate * 100)} percent booked.`}>
-          <StatCard label="Calls today" value={stats.callsToday} hint={`${Math.round(stats.conversionRate * 100)}% booked`} icon={<Phone className="h-4 w-4" />} accent />
-        </div>
-        <div aria-label={`Bookings today: ${stats.bookingsToday}. Revenue booked ${fmtMoney(stats.revenueBookedToday)}.`}>
-          <StatCard label="Bookings" value={stats.bookingsToday} hint={fmtMoney(stats.revenueBookedToday) + " booked"} icon={<CalendarDays className="h-4 w-4" />} />
-        </div>
-        <div aria-label={`New leads in pipeline: ${newLeads}.`}>
-          <StatCard label="New leads" value={newLeads} hint="In your pipeline" icon={<Users className="h-4 w-4" />} />
-        </div>
-        <div aria-label={`SMS sent: ${stats.smsSent}. Confirmations and replies.`}>
-          <StatCard label="SMS sent" value={stats.smsSent} hint="Confirmations & replies" icon={<Sparkles className="h-4 w-4" />} />
-        </div>
+        <StatCard label="Calls today" value={stats.callsToday} hint={isNew ? "—" : `${Math.round(stats.conversionRate * 100)}% booked`} icon={<Phone className="h-4 w-4" />} accent />
+        <StatCard label="Bookings" value={stats.bookingsToday} hint={isNew ? "—" : `${fmtMoney(stats.revenueBookedToday)} booked`} icon={<CalendarDays className="h-4 w-4" />} />
+        <StatCard label="New leads" value={newLeads} hint={isNew ? "—" : "In your pipeline"} icon={<Users className="h-4 w-4" />} />
+        <StatCard label="SMS sent" value={stats.smsSent} hint={isNew ? "—" : "Confirmations & replies"} icon={<Sparkles className="h-4 w-4" />} />
       </div>
 
-      {next && (
+      {next ? (
         <section className="mb-8">
           <SectionTitle title="Next booking" to="/calendar" />
           <Link
@@ -137,39 +107,52 @@ const Home = () => {
             <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
           </Link>
         </section>
+      ) : (
+        <section className="mb-8">
+          <SectionTitle title="Next booking" to="/calendar" />
+          <div className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground">
+            No upcoming bookings.
+          </div>
+        </section>
       )}
 
       <section>
         <SectionTitle title="Recent calls" to="/calls" />
-        <ul className="space-y-2">
-          {recent.map((c) => (
-            <li
-              key={c.id}
-              aria-label={`Recent call: ${c.caller}, status ${c.status}, started ${new Date(c.startedAt).toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}. Summary: ${c.summary}`}
-            >
-              <Link
-                to={`/calls/${c.id}`}
-                className="glass rounded-2xl p-4 flex items-center gap-3 hover:bg-secondary/40 transition-colors"
+        {recent.length === 0 ? (
+          <div className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground">
+            No calls yet.
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {recent.map((c) => (
+              <li
+                key={c.id}
+                aria-label={`Recent call: ${c.caller}, status ${c.status}, started ${new Date(c.startedAt).toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}. Summary: ${c.summary}`}
               >
-                <span
-                  className={
-                    "h-2 w-2 rounded-full shrink-0 " +
-                    (c.status === "booked"
-                      ? "bg-success"
-                      : c.status === "missed-followup"
-                      ? "bg-accent"
-                      : "bg-primary")
-                  }
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{c.caller}</div>
-                  <div className="text-xs text-muted-foreground truncate">{c.summary}</div>
-                </div>
-                <div className="text-xs text-muted-foreground shrink-0">{fmtRel(c.startedAt)}</div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                <Link
+                  to={`/calls/${c.id}`}
+                  className="glass rounded-2xl p-4 flex items-center gap-3 hover:bg-secondary/40 transition-colors"
+                >
+                  <span
+                    className={
+                      "h-2 w-2 rounded-full shrink-0 " +
+                      (c.status === "booked"
+                        ? "bg-success"
+                        : c.status === "missed-followup"
+                        ? "bg-accent"
+                        : "bg-primary")
+                    }
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{c.caller}</div>
+                    <div className="text-xs text-muted-foreground truncate">{c.summary}</div>
+                  </div>
+                  <div className="text-xs text-muted-foreground shrink-0">{fmtRel(c.startedAt)}</div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </AppShell>
   );
