@@ -7,10 +7,15 @@ import { LineChart, Line, ResponsiveContainer, Tooltip } from "recharts";
 const Reviews = () => {
   const avg = reviews.reduce((a, b) => a + b.rating, 0) / reviews.length;
   const trend = [4.2, 4.4, 4.5, 4.6, 4.7, 4.8, avg].map((v, i) => ({ i, v: Number(v.toFixed(2)) }));
+  const breakdown = [5, 4, 3, 2, 1].map((s) => ({ s, n: reviews.filter((r) => r.rating === s).length }));
+  const reviewsSummary =
+    `Reviews overview — total ${reviews.length}, average rating ${avg.toFixed(1)} stars. ` +
+    `Breakdown: ${breakdown.map((b) => `${b.n} ${b.s}-star`).join(", ")}.`;
 
   return (
     <AppShell>
       <PageHeader title="Reviews" subtitle="The AI asks every happy customer to leave one." />
+      <p className="sr-only" aria-label={reviewsSummary}>{reviewsSummary}</p>
 
       <div className="glass rounded-2xl p-5 mb-5">
         <div className="flex items-end justify-between">
@@ -57,7 +62,11 @@ const Reviews = () => {
       <h2 className="font-display text-lg font-semibold mb-3">Recent reviews</h2>
       <ul className="space-y-2">
         {reviews.map((r) => (
-          <li key={r.id} className="glass rounded-2xl p-4">
+          <li
+            key={r.id}
+            aria-label={`Review by ${r.customer}, ${r.rating} out of 5 stars on ${r.source}, posted ${new Date(r.postedAt).toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric" })}: ${r.body}`}
+            className="glass rounded-2xl p-4"
+          >
             <div className="flex items-center justify-between mb-1.5">
               <div className="font-medium">{r.customer}</div>
               <div className="flex gap-0.5">

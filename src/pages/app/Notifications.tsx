@@ -20,6 +20,14 @@ const Notifications = () => {
   const [prefs, setPrefs] = useState({ push: true, email: true, dailySummary: true, missedCall: true, newReview: false });
 
   const markAll = () => setItems((p) => p.map((n) => ({ ...n, read: true })));
+  const unread = items.filter((n) => !n.read).length;
+  const byType = items.reduce<Record<string, number>>((acc, n) => {
+    acc[n.type] = (acc[n.type] ?? 0) + 1;
+    return acc;
+  }, {});
+  const notifSummary =
+    `Notifications overview — total ${items.length}, unread ${unread}. By type: ` +
+    Object.entries(byType).map(([t, n]) => `${n} ${t}`).join(", ") + ".";
 
   return (
     <AppShell>
@@ -32,12 +40,16 @@ const Notifications = () => {
           </button>
         }
       />
+      <p className="sr-only" aria-label={notifSummary}>{notifSummary}</p>
 
       <ul className="space-y-2 mb-8">
         {items.map((n) => {
           const Icon = iconFor(n.type);
+          const notifLabel =
+            `${n.read ? "Read" : "Unread"} ${n.type} notification: ${n.title}. ${n.body} ` +
+            `Received ${new Date(n.at).toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}.`;
           return (
-            <li key={n.id} className={cn("glass rounded-2xl p-4 flex gap-3", !n.read && "ring-1 ring-primary/30")}>
+            <li key={n.id} aria-label={notifLabel} className={cn("glass rounded-2xl p-4 flex gap-3", !n.read && "ring-1 ring-primary/30")}>
               <span className={cn("h-9 w-9 rounded-full flex items-center justify-center shrink-0", toneFor(n.type))}>
                 <Icon className="h-4 w-4" />
               </span>

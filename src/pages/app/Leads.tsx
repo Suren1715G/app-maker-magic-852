@@ -29,22 +29,37 @@ const Leads = () => {
       Math.max(1, data.filter((l) => l.status !== "new").length)) *
       100
   );
+  const counts = {
+    new: data.filter((l) => l.status === "new").length,
+    contacted: data.filter((l) => l.status === "contacted").length,
+    converted: data.filter((l) => l.status === "converted").length,
+    lost: data.filter((l) => l.status === "lost").length,
+  };
+  const leadsSummary =
+    `Leads overview — pipeline ${data.length} (new ${counts.new}, contacted ${counts.contacted}, ` +
+    `converted ${counts.converted}, lost ${counts.lost}). Close rate ${closeRate}%. ` +
+    `Total won value ${fmtMoney(totalValue)}.`;
 
   return (
     <AppShell>
       <PageHeader title="Leads" subtitle="Every caller becomes a tracked opportunity." />
+      <p className="sr-only" aria-label={leadsSummary}>{leadsSummary}</p>
 
       <div className="grid grid-cols-3 gap-2 mb-5">
-        <Mini label="Pipeline" value={data.length} />
-        <Mini label="Close rate" value={`${closeRate}%`} />
-        <Mini label="Won" value={fmtMoney(totalValue)} />
+        <div aria-label={`Pipeline total: ${data.length} leads.`}><Mini label="Pipeline" value={data.length} /></div>
+        <div aria-label={`Close rate: ${closeRate} percent.`}><Mini label="Close rate" value={`${closeRate}%`} /></div>
+        <div aria-label={`Total won value: ${fmtMoney(totalValue)}.`}><Mini label="Won" value={fmtMoney(totalValue)} /></div>
       </div>
 
       <div className="flex gap-3 overflow-x-auto -mx-5 px-5 pb-3 no-scrollbar">
         {cols.map((c) => {
           const items = data.filter((l) => l.status === c.id);
           return (
-            <div key={c.id} className="min-w-[260px] w-[260px] glass rounded-2xl p-3">
+            <div
+              key={c.id}
+              aria-label={`${c.label} column: ${items.length} lead${items.length === 1 ? "" : "s"}.`}
+              className="min-w-[260px] w-[260px] glass rounded-2xl p-3"
+            >
               <div className="flex items-center justify-between mb-2 px-1">
                 <h3 className={cn("font-display text-sm font-semibold", c.tone)}>{c.label}</h3>
                 <span className="text-[10px] text-muted-foreground">{items.length}</span>
@@ -52,8 +67,13 @@ const Leads = () => {
               <ul className="space-y-2">
                 {items.map((l) => {
                   const Icon = sourceIcon(l.source);
+                  const leadLabel =
+                    `Lead: ${l.name} (${l.phone}). Status ${l.status}. Source ${l.source}. ` +
+                    `Estimated value ${fmtMoney(l.estValue)}. ` +
+                    `Last contact ${new Date(l.lastContactAt).toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}. ` +
+                    `Notes: ${l.notes}`;
                   return (
-                    <li key={l.id}>
+                    <li key={l.id} aria-label={leadLabel}>
                       <button
                         onClick={() => { setActive(l); setDraftNote(l.notes); }}
                         className="w-full text-left rounded-xl p-3 bg-card hover:bg-secondary/50 transition-colors border border-border/40"
