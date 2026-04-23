@@ -133,7 +133,7 @@ function OrbitalRing({
   tilt,
   color,
   speed,
-  thickness = 0.04,
+  thickness = 0.18,
 }: {
   radius: number;
   tilt: [number, number, number];
@@ -148,16 +148,17 @@ function OrbitalRing({
   });
   return (
     <mesh ref={ref} rotation={tilt}>
-      <torusGeometry args={[radius, thickness, 16, 128]} />
+      <torusGeometry args={[radius, thickness, 64, 256]} />
       <meshPhysicalMaterial
-        color="#f5f5f5"
+        color="#ffffff"
         metalness={1}
-        roughness={0.02}
+        roughness={0.01}
         clearcoat={1}
-        clearcoatRoughness={0.01}
-        envMapIntensity={3}
+        clearcoatRoughness={0.005}
+        reflectivity={1}
+        envMapIntensity={4.5}
         emissive={color}
-        emissiveIntensity={0.18}
+        emissiveIntensity={0.3}
         toneMapped={false}
       />
     </mesh>
@@ -220,10 +221,10 @@ function OrbitsScene() {
       <pointLight position={[6, -3, 3]} intensity={0.8} color="#f97316" />
       <pointLight position={[-6, 3, 3]} intensity={0.8} color="#3b82f6" />
       <ParallaxGroup strength={1.2}>
-        <OrbitalRing radius={5.5} tilt={[1.2, 0.3, 0.4]} color="#a855f7" speed={0.15} />
-        <OrbitalRing radius={6.8} tilt={[0.6, 1.1, -0.2]} color="#f97316" speed={-0.12} thickness={0.05} />
-        <OrbitalRing radius={4.2} tilt={[1.4, -0.5, 0.8]} color="#ec4899" speed={0.2} thickness={0.03} />
-        <OrbitalRing radius={8} tilt={[0.3, 0.8, 1.2]} color="#3b82f6" speed={-0.08} thickness={0.04} />
+      <OrbitalRing radius={5.5} tilt={[1.2, 0.3, 0.4]} color="#a855f7" speed={0.15} thickness={0.22} />
+      <OrbitalRing radius={6.8} tilt={[0.6, 1.1, -0.2]} color="#f97316" speed={-0.12} thickness={0.26} />
+      <OrbitalRing radius={4.2} tilt={[1.4, -0.5, 0.8]} color="#ec4899" speed={0.2} thickness={0.18} />
+      <OrbitalRing radius={8} tilt={[0.3, 0.8, 1.2]} color="#3b82f6" speed={-0.08} thickness={0.22} />
         {minis.map((m, i) => (
           <MiniCube key={i} {...m} />
         ))}
