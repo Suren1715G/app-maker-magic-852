@@ -54,15 +54,32 @@ const Calls = () => {
   const answered = calls.filter((c) => c.status !== "missed-followup").length;
   const missed = total - answered;
   const answerRate = Math.round((answered / Math.max(1, total)) * 100);
+  const booked = calls.filter((c) => c.status === "booked").length;
+  const followUp = calls.filter((c) => c.status === "missed-followup").length;
+  const visibleCount = list.length;
+
+  const summarySentence =
+    `Calls overview — total ${total}, answered ${answered}, missed ${missed}, ` +
+    `booked ${booked}, follow-up ${followUp}. Answer rate ${answerRate}%. ` +
+    `Currently showing ${visibleCount} call${visibleCount === 1 ? "" : "s"} ` +
+    `(filter: ${filter}, tag: ${tag}, range: ${range}).`;
 
   return (
     <AppShell>
       <PageHeader title="Calls" subtitle="Every conversation, captured." />
 
+      <p className="sr-only" aria-label={summarySentence}>{summarySentence}</p>
+
       <div className="grid grid-cols-3 gap-2 mb-4">
-        <StatCard label="Answered" value={answered} hint={`${answerRate}%`} />
-        <StatCard label="Missed" value={missed} hint="Auto SMS sent" />
-        <StatCard label="Total" value={total} hint="All time" />
+        <div aria-label={`Answered calls: ${answered} (${answerRate}% answer rate).`}>
+          <StatCard label="Answered" value={answered} hint={`${answerRate}%`} />
+        </div>
+        <div aria-label={`Missed calls: ${missed}. Auto SMS sent.`}>
+          <StatCard label="Missed" value={missed} hint="Auto SMS sent" />
+        </div>
+        <div aria-label={`Total calls all time: ${total}.`}>
+          <StatCard label="Total" value={total} hint="All time" />
+        </div>
       </div>
 
       <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-3 mb-3 no-scrollbar">
@@ -116,12 +133,22 @@ const Calls = () => {
       </div>
 
       <ul className="space-y-2">
-        {list.map((c) => {
+        {list.map((c, idx) => {
           const Icon = c.status === "missed-followup" ? PhoneMissed : c.status === "booked" ? CheckCircle2 : PhoneIncoming;
           const tone =
             c.status === "booked" ? "text-success" : c.status === "missed-followup" ? "text-accent" : "text-primary";
+          const callLabel =
+            `Call ${idx + 1} of ${visibleCount}: ${c.caller} (${c.phone}). ` +
+            `Status ${c.status}${c.tag ? `, tag ${c.tag}` : ""}. ` +
+            `Started ${new Date(c.startedAt).toLocaleString(undefined, {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            })}. Duration ${fmtDuration(c.durationSec)}. Summary: ${c.summary}`;
           return (
-            <li key={c.id}>
+            <li key={c.id} aria-label={callLabel}>
               <Link
                 to={`/calls/${c.id}`}
                 className="glass rounded-2xl p-4 flex gap-3 hover:bg-secondary/40 transition-colors"
