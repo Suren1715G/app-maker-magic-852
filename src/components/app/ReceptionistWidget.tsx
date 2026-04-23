@@ -4,9 +4,9 @@ import {
   useConversation,
   ConversationProvider,
   useConversationClientTool,
-  type MessagePayload,
   type DisconnectionDetails,
 } from "@elevenlabs/react";
+import type { MessagePayload } from "@elevenlabs/client";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
