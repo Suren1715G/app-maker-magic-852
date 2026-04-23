@@ -3,6 +3,7 @@ import { BottomNav } from "./BottomNav";
 import { DemoBanner } from "./DemoBanner";
 import { useDemoMode } from "@/contexts/DemoModeContext";
 import { LocationSwitcher } from "./LocationSwitcher";
+import { ReceptionistWidget } from "./ReceptionistWidget";
 import { WifiOff } from "lucide-react";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -37,6 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {children}
       </main>
       <BottomNav />
+      <ReceptionistWidget />
     </div>
   );
 }
