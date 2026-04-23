@@ -136,6 +136,8 @@
   .safe-top {
     padding-top: max(1rem, env(safe-area-inset-top));
   }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
 @keyframes float {
