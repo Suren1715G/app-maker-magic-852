@@ -95,6 +95,50 @@ const Settings = () => {
     navigate("/auth", { replace: true });
   };
 
+  // Load company AI settings
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("company_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!profile?.company_id) return;
+      setCompanyId(profile.company_id);
+      const { data: company } = await supabase
+        .from("companies")
+        .select("ai_system_prompt, ai_first_message, ai_voice_id")
+        .eq("id", profile.company_id)
+        .maybeSingle();
+      if (company?.ai_system_prompt) setAiPrompt(company.ai_system_prompt);
+      if (company?.ai_first_message) setGreeting(company.ai_first_message);
+      if (company?.ai_voice_id) setAiVoiceId(company.ai_voice_id);
+    })();
+  }, [user]);
+
+  const saveAi = async () => {
+    if (!companyId) {
+      toast.error("No company linked to your account");
+      return;
+    }
+    setSavingAi(true);
+    const { error } = await supabase
+      .from("companies")
+      .update({
+        ai_system_prompt: aiPrompt,
+        ai_first_message: greeting,
+        ai_voice_id: aiVoiceId,
+      })
+      .eq("id", companyId);
+    setSavingAi(false);
+    if (error) {
+      toast.error("Failed to save AI settings");
+    } else {
+      toast.success("AI receptionist updated");
+    }
+  };
+
   return (
     <AppShell>
       <PageHeader title="Settings" subtitle="Manage your AI receptionist." />
