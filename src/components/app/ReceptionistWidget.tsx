@@ -1,13 +1,13 @@
 import { useState, useCallback, useEffect } from "react";
 import { Mic, MicOff, PhoneOff, Phone, Sparkles, X, Loader2 } from "lucide-react";
-import { useConversation } from "@elevenlabs/react";
+import { useConversation, ConversationProvider } from "@elevenlabs/react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 type Transcript = { id: string; role: "user" | "agent"; text: string };
 
-export function ReceptionistWidget() {
+function ReceptionistWidgetInner() {
   const [open, setOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -240,5 +240,13 @@ export function ReceptionistWidget() {
         </div>
       )}
     </>
+  );
+}
+
+export function ReceptionistWidget() {
+  return (
+    <ConversationProvider>
+      <ReceptionistWidgetInner />
+    </ConversationProvider>
   );
 }
