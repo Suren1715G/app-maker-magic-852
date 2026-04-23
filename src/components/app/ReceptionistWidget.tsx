@@ -227,17 +227,41 @@ export function ReceptionistWidget() {
 
       const now = new Date();
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const dateContext =
-        `Current date and time: ${now.toLocaleString(undefined, { dateStyle: "full", timeStyle: "long" })} ` +
-        `(${tz}). Today is ${now.toLocaleDateString(undefined, { weekday: "long" })}. ` +
-        `Use this when the user asks about the day, date, or time. ` +
-        `If the call is long, you can call the get_current_time tool to refresh.`;
+      const initialScreen = await captureVisibleScreenAfterDelay(0, 6000);
+
+      const sessionPrompt = [
+        "You are the in-app AI receptionist for a small business owner.",
+        "",
+        "## Tools you have",
+        "- get_current_screen(): returns the user's currently visible screen content. CALL THIS whenever the user asks about what's on their screen, what they see, what's in front of them, or anything specific to the current page.",
+        "- navigate_to(destination): opens a page in the app (home, calls, calendar, sms, leads, reviews, analytics, notifications, billing, referrals, support, assistant, settings).",
+        "- get_current_time(): returns the current date, day, and time.",
+        "",
+        "## Rules",
+        "- You CAN see the user's screen — never tell them you cannot. Always call get_current_screen first if uncertain.",
+        "- Only state facts that appear in the screen tool result. Do not invent counts, names, numbers, or items.",
+        "- After navigating, call get_current_screen to describe the new page.",
+        "- Be brief and conversational.",
+        "",
+        `## Current context`,
+        `Date/time: ${now.toLocaleString(undefined, { dateStyle: "full", timeStyle: "long" })} (${tz}).`,
+        `Today is ${now.toLocaleDateString(undefined, { weekday: "long" })}.`,
+        `Current page path: ${initialScreen.path}`,
+        initialScreen.title ? `Page title: ${initialScreen.title}` : "",
+        "",
+        "Initial visible screen content (use this until the user navigates):",
+        "----- BEGIN VISIBLE SCREEN -----",
+        initialScreen.content || "(empty)",
+        "----- END VISIBLE SCREEN -----",
+      ]
+        .filter(Boolean)
+        .join("\n");
 
       await conversation.startSession({
         signedUrl: data.signedUrl,
         overrides: {
           agent: {
-            prompt: { prompt: dateContext },
+            prompt: { prompt: sessionPrompt },
           },
         },
       });
