@@ -3,9 +3,46 @@ import { StatCard } from "@/components/app/StatCard";
 import { calls, bookings, stats, leads, notifications } from "@/data/mock";
 import { fmtDay, fmtMoney, fmtRel, fmtTime } from "@/lib/format";
 import { Link } from "react-router-dom";
-import { ArrowRight, CalendarDays, Phone, Sparkles, TrendingUp, Clock, Users } from "lucide-react";
+import { ArrowRight, CalendarDays, Phone, Sparkles, Clock, Users, PhoneIncoming } from "lucide-react";
+import { useDemoMode } from "@/contexts/DemoModeContext";
+import { useLocationCtx } from "@/contexts/LocationContext";
 
 const Home = () => {
+  const { demoMode } = useDemoMode();
+  const { list: locationList } = useLocationCtx();
+  // A "new customer" is a real (non-demo) user with no locations set up yet.
+  const isNewCustomer = !demoMode && locationList.length === 0;
+
+  if (isNewCustomer) {
+    return (
+      <AppShell>
+        <header className="pt-4 pb-6">
+          <span className="text-muted-foreground text-sm block">Welcome</span>
+          <h1 className="font-display text-4xl font-semibold leading-none mt-1">
+            <span className="prism-text">SGS</span>
+          </h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Add your first location to start receiving calls.
+          </p>
+        </header>
+
+        <div className="glass rounded-2xl p-6 text-center">
+          <span className="mx-auto mb-4 h-14 w-14 rounded-full bg-primary/15 text-primary flex items-center justify-center">
+            <PhoneIncoming className="h-6 w-6" />
+          </span>
+          <div className="font-display text-lg font-semibold mb-1">No data yet</div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Once your AI receptionist starts answering calls, you'll see your stats,
+            bookings and leads here.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Tap <span className="font-medium">Add location</span> in the top‑right to get started.
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
+
   const recent = [...calls].sort((a, b) => +new Date(b.startedAt) - +new Date(a.startedAt)).slice(0, 3);
   const next = [...bookings].sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt))[0];
   const newLeads = leads.filter((l) => l.status === "new" || l.status === "contacted").length;
