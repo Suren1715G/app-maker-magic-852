@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail } from "lucide-react";
+import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Zap, Monitor, Smartphone } from "lucide-react";
+import { sessions } from "@/data/mock";
+import { fmtRel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -39,6 +41,13 @@ const Settings = () => {
     { email: "owner@sgs.com", role: "Owner" },
   ]);
   const [teamEmail, setTeamEmail] = useState("");
+
+  // White label
+  const [whiteLabel, setWhiteLabel] = useState(false);
+  const [brandName, setBrandName] = useState("SGS AI");
+
+  // Zapier
+  const [zapHook, setZapHook] = useState("");
 
   const inviteTeammate = () => {
     if (!teamEmail.trim()) return;
