@@ -1,102 +1,90 @@
-import { useState, useRef, useEffect } from "react";
-import { Bot, Send, Sparkles, X } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { useState, useCallback, useEffect } from "react";
+import { Mic, MicOff, PhoneOff, Phone, Sparkles, X, Loader2 } from "lucide-react";
+import { useConversation } from "@elevenlabs/react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { stats, weeklySeries, leads, reviews } from "@/data/mock";
 
-type Msg = { role: "user" | "assistant"; content: string };
-
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/assistant-chat`;
-
-const quickPrompts = [
-  "How many leads this week?",
-  "What's my close rate?",
-  "Summarize today",
-];
+type Transcript = { id: string; role: "user" | "agent"; text: string };
 
 export function ReceptionistWidget() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>([
-    { role: "assistant", content: "Hi 👋 I'm your AI receptionist. Ask me anything about your business or how to use SGS." },
-  ]);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
 
+  const conversation = useConversation({
+    onConnect: () => toast.success("Connected to your AI receptionist"),
+    onDisconnect: () => {
+      setElapsed(0);
+      setMuted(false);
+    },
+    onError: (err: unknown) => {
+      console.error("Voice error:", err);
+      toast.error("Voice connection error");
+    },
+    onMessage: (msg: { source: "user" | "ai"; message: string }) => {
+      if (!msg?.message) return;
+      setTranscripts((p) => [
+        ...p,
+        { id: crypto.randomUUID(), role: msg.source === "user" ? "user" : "agent", text: msg.message },
+      ]);
+    },
+  });
+
+  const status = conversation.status;
+  const isConnected = status === "connected";
+  const isSpeaking = conversation.isSpeaking;
+
+  // Call timer
   useEffect(() => {
-    if (open) endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, open]);
+    if (!isConnected) return;
+    const t = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(t);
+  }, [isConnected]);
 
-  const send = async (text: string) => {
-    if (!text.trim() || busy) return;
-    const userMsg: Msg = { role: "user", content: text };
-    const next = [...messages, userMsg];
-    setMessages(next);
-    setInput("");
-    setBusy(true);
-
-    const context = JSON.stringify({
-      stats,
-      weekly: weeklySeries,
-      leadsCount: leads.length,
-      converted: leads.filter((l) => l.status === "converted").length,
-      avgRating: reviews.reduce((a, b) => a + b.rating, 0) / reviews.length,
-    });
-
+  const startCall = useCallback(async () => {
+    setConnecting(true);
     try {
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          messages: next.map((m) => ({ role: m.role, content: m.content })),
-          context,
-        }),
-      });
+      await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      if (resp.status === 429) { toast.error("Rate limit — try again in a sec."); setBusy(false); return; }
-      if (resp.status === 402) { toast.error("AI credits exhausted."); setBusy(false); return; }
-      if (!resp.ok || !resp.body) { toast.error("Receptionist unavailable"); setBusy(false); return; }
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      let soFar = "";
-      setMessages((p) => [...p, { role: "assistant", content: "" }]);
-
-      let done = false;
-      while (!done) {
-        const { done: d, value } = await reader.read();
-        if (d) break;
-        buf += decoder.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf("\n")) !== -1) {
-          let line = buf.slice(0, nl); buf = buf.slice(nl + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line.startsWith("data: ")) continue;
-          const json = line.slice(6).trim();
-          if (json === "[DONE]") { done = true; break; }
-          try {
-            const parsed = JSON.parse(json);
-            const c = parsed.choices?.[0]?.delta?.content;
-            if (c) {
-              soFar += c;
-              setMessages((p) => p.map((m, i) => i === p.length - 1 ? { ...m, content: soFar } : m));
-            }
-          } catch { buf = line + "\n" + buf; break; }
-        }
+      const { data, error } = await supabase.functions.invoke("voice-token");
+      if (error || !data?.token) {
+        console.error("Token error:", error, data);
+        toast.error("Could not start call");
+        return;
       }
-    } catch {
-      toast.error("Network error");
+
+      setTranscripts([]);
+      await conversation.startSession({
+        conversationToken: data.token,
+        connectionType: "webrtc",
+      });
+    } catch (e) {
+      console.error(e);
+      toast.error("Microphone permission required");
     } finally {
-      setBusy(false);
+      setConnecting(false);
     }
-  };
+  }, [conversation]);
+
+  const endCall = useCallback(async () => {
+    await conversation.endSession();
+  }, [conversation]);
+
+  const toggleMute = useCallback(async () => {
+    const next = !muted;
+    setMuted(next);
+    try {
+      conversation.setMuted?.(next);
+    } catch {
+      // no-op
+    }
+  }, [muted, conversation]);
+
+  const formatTime = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   return (
     <>
@@ -105,15 +93,20 @@ export function ReceptionistWidget() {
         onClick={() => setOpen((o) => !o)}
         aria-label="Open AI receptionist"
         className={cn(
-          "fixed bottom-24 right-4 z-40 h-13 w-13 rounded-full shadow-lg",
+          "fixed bottom-24 right-4 z-40 h-12 w-12 rounded-full shadow-lg",
           "bg-gradient-to-br from-primary to-accent text-primary-foreground",
           "flex items-center justify-center transition-all hover:scale-105",
-          "h-12 w-12",
+          isConnected && "ring-4 ring-success/40 animate-pulse",
         )}
       >
-        {open ? <X className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
+        {open ? <X className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
         {!open && (
-          <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-success border-2 border-background" />
+          <span
+            className={cn(
+              "absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background",
+              isConnected ? "bg-success animate-pulse" : "bg-success",
+            )}
+          />
         )}
       </button>
 
@@ -121,7 +114,8 @@ export function ReceptionistWidget() {
       {open && (
         <div className="fixed inset-0 z-40 pointer-events-none">
           <div className="absolute bottom-40 right-4 left-4 sm:left-auto sm:w-[360px] pointer-events-auto">
-            <div className="glass-strong rounded-3xl border border-border/60 shadow-2xl flex flex-col max-h-[70vh] overflow-hidden animate-slide-up">
+            <div className="glass-strong rounded-3xl border border-border/60 shadow-2xl flex flex-col max-h-[75vh] overflow-hidden animate-slide-up">
+              {/* Header */}
               <div className="flex items-center gap-2 px-4 py-3 border-b border-border/60">
                 <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center">
                   <Sparkles className="h-4 w-4" />
@@ -129,7 +123,17 @@ export function ReceptionistWidget() {
                 <div className="flex-1">
                   <div className="text-sm font-semibold leading-tight">AI Receptionist</div>
                   <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-success" /> Online · Always available
+                    <span
+                      className={cn(
+                        "h-1.5 w-1.5 rounded-full",
+                        isConnected ? "bg-success animate-pulse" : "bg-muted-foreground/50",
+                      )}
+                    />
+                    {isConnected
+                      ? isSpeaking
+                        ? "Speaking…"
+                        : "Listening…"
+                      : "Tap call to start"}
                   </div>
                 </div>
                 <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
@@ -137,57 +141,100 @@ export function ReceptionistWidget() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
-                {messages.map((m, i) => (
-                  <div key={i} className={`flex gap-2 ${m.role === "user" ? "justify-end" : ""}`}>
-                    {m.role === "assistant" && (
-                      <span className="h-6 w-6 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                        <Bot className="h-3 w-3" />
-                      </span>
+              {/* Visualizer / Avatar */}
+              <div className="flex flex-col items-center justify-center py-6 gap-3">
+                <div className="relative">
+                  <div
+                    className={cn(
+                      "h-24 w-24 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center",
+                      "shadow-[0_0_40px_-10px_hsl(var(--primary)/0.6)]",
+                      isSpeaking && "animate-pulse",
                     )}
-                    <div
-                      className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${
-                        m.role === "user" ? "bg-primary text-primary-foreground" : "bg-card border border-border/60"
-                      }`}
-                    >
-                      <div className="prose prose-xs prose-invert max-w-none [&>p]:my-0.5 [&>ul]:my-0.5 [&>ol]:my-0.5">
-                        <ReactMarkdown>{m.content || "…"}</ReactMarkdown>
-                      </div>
-                    </div>
+                  >
+                    <Sparkles className="h-10 w-10 text-primary-foreground" />
                   </div>
-                ))}
-                <div ref={endRef} />
+                  {isConnected && (
+                    <>
+                      <span className="absolute inset-0 rounded-full ring-2 ring-primary/30 animate-ping" />
+                      {isSpeaking && (
+                        <span className="absolute -inset-2 rounded-full ring-2 ring-accent/40 animate-ping" />
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="text-center">
+                  {isConnected ? (
+                    <div className="text-xs font-mono text-muted-foreground">{formatTime(elapsed)}</div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground max-w-[240px]">
+                      Hands-free call. Just speak — your AI receptionist will answer back.
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {messages.length <= 1 && (
-                <div className="flex flex-wrap gap-1.5 px-3 pb-2">
-                  {quickPrompts.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => send(s)}
-                      className="text-[10px] px-2.5 py-1 rounded-full bg-card border border-border text-muted-foreground hover:text-foreground"
+              {/* Live transcript */}
+              {isConnected && transcripts.length > 0 && (
+                <div className="flex-1 overflow-y-auto px-3 pb-2 space-y-1.5 max-h-[180px]">
+                  {transcripts.slice(-6).map((t) => (
+                    <div
+                      key={t.id}
+                      className={cn(
+                        "text-[11px] px-2.5 py-1.5 rounded-xl",
+                        t.role === "user"
+                          ? "bg-primary/10 text-foreground ml-6"
+                          : "bg-card border border-border/60 text-muted-foreground mr-6",
+                      )}
                     >
-                      {s}
-                    </button>
+                      <span className="font-medium mr-1">{t.role === "user" ? "You:" : "AI:"}</span>
+                      {t.text}
+                    </div>
                   ))}
                 </div>
               )}
 
-              <form
-                onSubmit={(e) => { e.preventDefault(); send(input); }}
-                className="border-t border-border/60 p-2 flex items-center gap-2"
-              >
-                <Input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask anything…"
-                  className="border-0 bg-transparent focus-visible:ring-0 h-9 text-sm"
-                  disabled={busy}
-                />
-                <Button type="submit" size="icon" className="h-8 w-8 rounded-full shrink-0" disabled={busy || !input.trim()}>
-                  <Send className="h-3.5 w-3.5" />
-                </Button>
-              </form>
+              {/* Controls */}
+              <div className="border-t border-border/60 p-4 flex items-center justify-center gap-3">
+                {!isConnected ? (
+                  <button
+                    onClick={startCall}
+                    disabled={connecting}
+                    className="h-14 px-6 rounded-full bg-success text-success-foreground font-semibold text-sm flex items-center gap-2 shadow-lg hover:scale-105 transition-transform disabled:opacity-60"
+                  >
+                    {connecting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Connecting…
+                      </>
+                    ) : (
+                      <>
+                        <Phone className="h-4 w-4" /> Start call
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={toggleMute}
+                      className={cn(
+                        "h-12 w-12 rounded-full flex items-center justify-center transition-colors",
+                        muted
+                          ? "bg-destructive text-destructive-foreground"
+                          : "bg-card border border-border text-foreground",
+                      )}
+                      aria-label={muted ? "Unmute" : "Mute"}
+                    >
+                      {muted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                    </button>
+                    <button
+                      onClick={endCall}
+                      className="h-14 w-14 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+                      aria-label="End call"
+                    >
+                      <PhoneOff className="h-5 w-5" />
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
