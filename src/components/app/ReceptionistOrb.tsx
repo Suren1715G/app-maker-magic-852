@@ -18,13 +18,13 @@ function Orb({ speaking, connected }: { speaking: boolean; connected: boolean })
 
   return (
     <mesh ref={mesh}>
-      <sphereGeometry args={[1, 64, 64]} />
+      <sphereGeometry args={[1, 32, 32]} />
       <MeshDistortMaterial
         color={speaking ? "#a855f7" : connected ? "#6366f1" : "#475569"}
         emissive={speaking ? "#7c3aed" : "#312e81"}
         emissiveIntensity={speaking ? 0.6 : 0.25}
-        distort={speaking ? 0.55 : connected ? 0.3 : 0.18}
-        speed={speaking ? 4 : 1.2}
+        distort={speaking ? 0.45 : connected ? 0.25 : 0.15}
+        speed={speaking ? 3 : 1}
         roughness={0.2}
         metalness={0.6}
       />
@@ -43,7 +43,12 @@ export function ReceptionistOrb({
 }) {
   return (
     <div style={{ width: size, height: size }} className="rounded-full overflow-hidden">
-      <Canvas camera={{ position: [0, 0, 2.6], fov: 45 }} dpr={[1, 2]}>
+      <Canvas
+        camera={{ position: [0, 0, 2.6], fov: 45 }}
+        dpr={[1, 1.5]}
+        frameloop="always"
+        gl={{ antialias: false, powerPreference: "low-power", alpha: true }}
+      >
         <ambientLight intensity={0.6} />
         <directionalLight position={[2, 2, 2]} intensity={1.2} />
         <pointLight position={[-2, -1, -1]} intensity={0.8} color="#a855f7" />
