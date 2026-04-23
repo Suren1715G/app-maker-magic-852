@@ -1,12 +1,15 @@
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { reviews } from "@/data/mock";
+import { reviews as mockReviews } from "@/data/mock";
 import { fmtRel } from "@/lib/format";
 import { Star, ExternalLink, TrendingUp } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, Tooltip } from "recharts";
+import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 
 const Reviews = () => {
-  const avg = reviews.reduce((a, b) => a + b.rating, 0) / reviews.length;
-  const trend = [4.2, 4.4, 4.5, 4.6, 4.7, 4.8, avg].map((v, i) => ({ i, v: Number(v.toFixed(2)) }));
+  const isNew = useIsNewCustomer();
+  const reviews = isNew ? [] : mockReviews;
+  const avg = reviews.length ? reviews.reduce((a, b) => a + b.rating, 0) / reviews.length : 0;
+  const trend = (isNew ? [0, 0, 0, 0, 0, 0, 0] : [4.2, 4.4, 4.5, 4.6, 4.7, 4.8, avg]).map((v, i) => ({ i, v: Number(v.toFixed(2)) }));
   const breakdown = [5, 4, 3, 2, 1].map((s) => ({ s, n: reviews.filter((r) => r.rating === s).length }));
   const reviewsSummary =
     `Reviews overview — total ${reviews.length}, average rating ${avg.toFixed(1)} stars. ` +
@@ -22,10 +25,12 @@ const Reviews = () => {
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Average rating</div>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="font-display text-4xl font-semibold">{avg.toFixed(1)}</span>
-              <span className="text-sm text-success flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" /> +0.6 / 30d
-              </span>
+              <span className="font-display text-4xl font-semibold">{reviews.length ? avg.toFixed(1) : "—"}</span>
+              {reviews.length > 0 && (
+                <span className="text-sm text-success flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3" /> +0.6 / 30d
+                </span>
+              )}
             </div>
             <div className="flex gap-0.5 mt-1">
               {[1, 2, 3, 4, 5].map((n) => (
@@ -45,8 +50,8 @@ const Reviews = () => {
 
         <div className="grid grid-cols-3 gap-2 mt-5 text-center">
           <Tile label="Total" value={reviews.length} />
-          <Tile label="AI-prompted" value={`${reviews.length}/5`} />
-          <Tile label="Conversion" value="64%" />
+          <Tile label="AI-prompted" value={reviews.length ? `${reviews.length}/5` : "0"} />
+          <Tile label="Conversion" value={reviews.length ? "64%" : "—"} />
         </div>
 
         <a
@@ -60,6 +65,11 @@ const Reviews = () => {
       </div>
 
       <h2 className="font-display text-lg font-semibold mb-3">Recent reviews</h2>
+      {reviews.length === 0 ? (
+        <div className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground">
+          No reviews yet.
+        </div>
+      ) : (
       <ul className="space-y-2">
         {reviews.map((r) => (
           <li
@@ -80,6 +90,7 @@ const Reviews = () => {
           </li>
         ))}
       </ul>
+      )}
     </AppShell>
   );
 };
