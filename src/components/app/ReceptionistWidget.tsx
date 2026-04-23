@@ -171,6 +171,20 @@ export function ReceptionistWidget() {
     }
   });
 
+  // Tool: current date & time (so the AI doesn't guess)
+  useConversationClientTool("get_current_time", async () => {
+    const now = new Date();
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return JSON.stringify({
+      iso: now.toISOString(),
+      local: now.toLocaleString(undefined, { dateStyle: "full", timeStyle: "long" }),
+      timezone: tz,
+      day: now.toLocaleDateString(undefined, { weekday: "long" }),
+      date: now.toLocaleDateString(),
+      time: now.toLocaleTimeString(),
+    });
+  });
+
   const status = conversation.status;
   const isConnected = status === "connected";
   const isSpeaking = conversation.isSpeaking;
@@ -210,7 +224,23 @@ export function ReceptionistWidget() {
 
       setTranscripts([]);
       setElapsed(0);
-      await conversation.startSession({ signedUrl: data.signedUrl });
+
+      const now = new Date();
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const dateContext =
+        `Current date and time: ${now.toLocaleString(undefined, { dateStyle: "full", timeStyle: "long" })} ` +
+        `(${tz}). Today is ${now.toLocaleDateString(undefined, { weekday: "long" })}. ` +
+        `Use this when the user asks about the day, date, or time. ` +
+        `If the call is long, you can call the get_current_time tool to refresh.`;
+
+      await conversation.startSession({
+        signedUrl: data.signedUrl,
+        overrides: {
+          agent: {
+            prompt: { prompt: dateContext },
+          },
+        },
+      });
     } catch (e) {
       console.error(e);
       toast.error("Microphone permission required");
