@@ -21,19 +21,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <div className="min-h-screen w-full max-w-md mx-auto relative">
+    <div className="min-h-screen w-full max-w-md md:max-w-3xl lg:max-w-5xl mx-auto relative">
       <DemoBanner />
       {!online && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-accent text-accent-foreground text-[11px] font-medium">
-          <div className="max-w-md mx-auto px-4 py-1.5 flex items-center gap-1.5 justify-center">
+          <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto px-4 py-1.5 flex items-center gap-1.5 justify-center">
             <WifiOff className="h-3 w-3" /> Offline — viewing cached data
           </div>
         </div>
       )}
-      <div className={`fixed right-3 z-30 ${demoMode ? "top-11" : "top-3"}`}>
+      <div className={`fixed right-3 md:right-6 z-30 ${demoMode ? "top-11" : "top-3"}`}>
         <LocationSwitcher />
       </div>
-      <main className={`pb-28 safe-top px-5 animate-slide-up ${demoMode ? "pt-10" : ""}`}>
+      <main className={`pb-28 safe-top px-5 md:px-8 lg:px-12 animate-slide-up ${demoMode ? "pt-10" : ""}`}>
         {children}
       </main>
       <BottomNav />
