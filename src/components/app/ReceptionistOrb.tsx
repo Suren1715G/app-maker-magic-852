@@ -1,5 +1,5 @@
 import { Canvas, useFrame } from "@react-three/fiber";
-import { MeshDistortMaterial, Sphere } from "@react-three/drei";
+import { MeshDistortMaterial } from "@react-three/drei";
 import { useRef } from "react";
 import type { Mesh } from "three";
 
@@ -17,7 +17,8 @@ function Orb({ speaking, connected }: { speaking: boolean; connected: boolean })
   });
 
   return (
-    <Sphere ref={mesh} args={[1, 64, 64]}>
+    <mesh ref={mesh}>
+      <sphereGeometry args={[1, 64, 64]} />
       <MeshDistortMaterial
         color={speaking ? "#a855f7" : connected ? "#6366f1" : "#475569"}
         emissive={speaking ? "#7c3aed" : "#312e81"}
@@ -27,7 +28,7 @@ function Orb({ speaking, connected }: { speaking: boolean; connected: boolean })
         roughness={0.2}
         metalness={0.6}
       />
-    </Sphere>
+    </mesh>
   );
 }
 
