@@ -1,13 +1,40 @@
 import { useState, useCallback, useEffect } from "react";
 import { Mic, MicOff, PhoneOff, Phone, Sparkles, X, Loader2 } from "lucide-react";
 import { useConversation, ConversationProvider } from "@elevenlabs/react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 type Transcript = { id: string; role: "user" | "agent"; text: string };
 
+// Map of friendly destinations the AI can navigate to.
+// Keep keys lowercase and simple — the agent matches on these.
+const NAV_DESTINATIONS: Record<string, { path: string; label: string }> = {
+  home: { path: "/", label: "Home" },
+  dashboard: { path: "/", label: "Home" },
+  calls: { path: "/calls", label: "Calls" },
+  calendar: { path: "/calendar", label: "Calendar" },
+  appointments: { path: "/calendar", label: "Calendar" },
+  schedule: { path: "/calendar", label: "Calendar" },
+  sms: { path: "/sms", label: "Messages" },
+  messages: { path: "/sms", label: "Messages" },
+  texts: { path: "/sms", label: "Messages" },
+  leads: { path: "/leads", label: "Leads" },
+  reviews: { path: "/reviews", label: "Reviews" },
+  analytics: { path: "/analytics", label: "Analytics" },
+  reports: { path: "/analytics", label: "Analytics" },
+  notifications: { path: "/notifications", label: "Notifications" },
+  billing: { path: "/billing", label: "Billing" },
+  referrals: { path: "/referrals", label: "Referrals" },
+  support: { path: "/support", label: "Support" },
+  help: { path: "/support", label: "Support" },
+  assistant: { path: "/assistant", label: "Assistant" },
+  settings: { path: "/settings", label: "Settings" },
+};
+
 function ReceptionistWidgetInner() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -15,6 +42,22 @@ function ReceptionistWidgetInner() {
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
 
   const conversation = useConversation({
+    clientTools: {
+      // Agent calls this to navigate the user inside the app.
+      navigate_to: (params: { destination?: string }) => {
+        const key = (params?.destination ?? "").toLowerCase().trim();
+        const match = NAV_DESTINATIONS[key];
+        if (!match) {
+          return `Unknown destination "${params?.destination}". Available: ${Object.keys(
+            NAV_DESTINATIONS,
+          ).join(", ")}`;
+        }
+        navigate(match.path);
+        toast.success(`Opening ${match.label}`);
+        setOpen(false);
+        return `Navigated to ${match.label}`;
+      },
+    },
     onConnect: () => toast.success("Connected to your AI receptionist"),
     onDisconnect: () => {
       setElapsed(0);
