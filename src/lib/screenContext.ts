@@ -32,6 +32,12 @@ function extractStructured(root: HTMLElement, maxChars: number): string {
     push("[BTN]", label);
   });
 
+  // Explicit accessibility labels often contain the clearest screen context
+  root.querySelectorAll("[aria-label]").forEach((el) => {
+    const label = el.getAttribute("aria-label") || "";
+    push("[LABEL]", label);
+  });
+
   // Generic readable text (paragraphs, list items, table cells, badges)
   root
     .querySelectorAll("p, li, td, th, [role='listitem'], .badge, span")
