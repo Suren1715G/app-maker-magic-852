@@ -270,107 +270,88 @@ export function ReceptionistWidget() {
       {/* Panel */}
       {open && (
         <div className="fixed inset-0 z-40 pointer-events-none">
-          <div className="absolute bottom-40 right-4 left-4 sm:left-auto sm:w-[360px] pointer-events-auto">
-            <div className="glass-strong rounded-3xl border border-border/60 shadow-2xl flex flex-col max-h-[75vh] overflow-hidden animate-slide-up">
+          <div
+            className={cn(
+              "absolute pointer-events-auto",
+              isConnected
+                ? "bottom-40 right-4 w-[220px]"
+                : "bottom-40 right-4 left-4 sm:left-auto sm:w-[360px]",
+            )}
+          >
+            <div
+              className={cn(
+                "glass-strong rounded-3xl border border-border/60 shadow-2xl flex flex-col overflow-hidden animate-slide-up",
+                isConnected ? "max-h-[260px]" : "max-h-[75vh]",
+              )}
+            >
               {/* Header */}
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-border/60">
-                <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center">
-                  <Sparkles className="h-4 w-4" />
-                </span>
-                <div className="flex-1">
-                  <div className="text-sm font-semibold leading-tight">AI Receptionist</div>
-                  <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    <span
-                      className={cn(
-                        "h-1.5 w-1.5 rounded-full",
-                        isConnected ? "bg-success animate-pulse" : "bg-muted-foreground/50",
-                      )}
-                    />
-                    {isConnected
-                      ? isSpeaking
-                        ? "Speaking…"
-                        : "Listening…"
-                        : quotaExceeded
-                          ? "Voice unavailable"
-                      : connecting
-                        ? "Connecting…"
-                        : "Tap call to start"}
+              {!isConnected && (
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-border/60">
+                  <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center">
+                    <Sparkles className="h-4 w-4" />
+                  </span>
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold leading-tight">AI Receptionist</div>
+                    <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+                      {quotaExceeded
+                        ? "Voice unavailable"
+                        : connecting
+                          ? "Connecting…"
+                          : "Tap call to start"}
+                    </div>
                   </div>
-                </div>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="text-muted-foreground hover:text-foreground"
-                  aria-label="Close"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Avatar */}
-              <div className="flex flex-col items-center justify-center py-6 gap-3">
-                <div className="relative">
-                  <div
-                    className={cn(
-                      "h-24 w-24 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center",
-                      "shadow-[0_0_40px_-10px_hsl(var(--primary)/0.6)]",
-                      isSpeaking && "animate-pulse",
-                    )}
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label="Close"
                   >
-                    <Sparkles className="h-10 w-10 text-primary-foreground" />
-                  </div>
-                  {isConnected && (
-                    <>
-                      <span className="absolute inset-0 rounded-full ring-2 ring-primary/30 animate-ping" />
-                      {isSpeaking && (
-                        <span className="absolute -inset-2 rounded-full ring-2 ring-accent/40 animate-ping" />
-                      )}
-                    </>
-                  )}
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
+              )}
+
+              {/* Avatar / Orb */}
+              <div
+                className={cn(
+                  "flex flex-col items-center justify-center gap-2",
+                  isConnected ? "pt-4 pb-2" : "py-6",
+                )}
+              >
+                <ReceptionistOrb
+                  speaking={isSpeaking}
+                  connected={isConnected}
+                  size={isConnected ? 88 : 110}
+                />
                 <div className="text-center">
                   {isConnected ? (
-                    <div className="text-xs font-mono text-muted-foreground">
-                      {formatTime(elapsed)}
+                    <div className="flex flex-col items-center gap-0.5">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        {isSpeaking ? "Speaking…" : "Listening…"}
+                      </div>
+                      <div className="text-xs font-mono text-foreground">
+                        {formatTime(elapsed)}
+                      </div>
                     </div>
                   ) : callError ? (
-                    <div className="text-xs text-destructive max-w-[240px]">
+                    <div className="text-xs text-destructive max-w-[240px] px-3">
                       {callError}
                     </div>
                   ) : (
-                    <div className="text-xs text-muted-foreground max-w-[240px]">
+                    <div className="text-xs text-muted-foreground max-w-[240px] px-3">
                       Hands-free call. Just speak — your AI receptionist will answer back.
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Live transcript */}
-              {isConnected && transcripts.length > 0 && (
-                <div
-                  ref={transcriptScrollRef}
-                  className="flex-1 overflow-y-auto px-3 pb-2 space-y-1.5 max-h-[200px]"
-                >
-                  {transcripts.slice(-12).map((t) => (
-                    <div
-                      key={t.id}
-                      className={cn(
-                        "text-[11px] px-2.5 py-1.5 rounded-xl",
-                        t.role === "user"
-                          ? "bg-primary/10 text-foreground ml-6"
-                          : "bg-card border border-border/60 text-muted-foreground mr-6",
-                      )}
-                    >
-                      <span className="font-medium mr-1">
-                        {t.role === "user" ? "You:" : "AI:"}
-                      </span>
-                      {t.text}
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {/* Controls */}
-              <div className="border-t border-border/60 p-4 flex items-center justify-center gap-3">
+              <div
+                className={cn(
+                  "flex items-center justify-center gap-3",
+                  isConnected ? "p-3" : "border-t border-border/60 p-4",
+                )}
+              >
                 {!isConnected ? (
                   <button
                     onClick={startCall}
@@ -396,21 +377,28 @@ export function ReceptionistWidget() {
                     <button
                       onClick={toggleMute}
                       className={cn(
-                        "h-12 w-12 rounded-full flex items-center justify-center transition-colors",
+                        "h-10 w-10 rounded-full flex items-center justify-center transition-colors",
                         muted
                           ? "bg-destructive text-destructive-foreground"
                           : "bg-card border border-border text-foreground",
                       )}
                       aria-label={muted ? "Unmute" : "Mute"}
                     >
-                      {muted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                      {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                     </button>
                     <button
                       onClick={endCall}
-                      className="h-14 w-14 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+                      className="h-12 w-12 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
                       aria-label="End call"
                     >
-                      <PhoneOff className="h-5 w-5" />
+                      <PhoneOff className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setOpen(false)}
+                      className="h-10 w-10 rounded-full bg-card border border-border text-muted-foreground hover:text-foreground flex items-center justify-center"
+                      aria-label="Hide"
+                    >
+                      <X className="h-4 w-4" />
                     </button>
                   </>
                 )}
