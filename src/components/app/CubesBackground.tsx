@@ -142,12 +142,27 @@ function OrbitalRing({
   thickness?: number;
 }) {
   const ref = useRef<THREE.Mesh>(null);
+  // Each ring gets its own random tumble axes + phases so motion feels organic.
+  const motion = useMemo(
+    () => ({
+      sx: speed * (0.6 + Math.random() * 0.8) * (Math.random() > 0.5 ? 1 : -1),
+      sy: speed * (0.7 + Math.random() * 0.9) * (Math.random() > 0.5 ? 1 : -1),
+      sz: speed * (0.8 + Math.random() * 1.1),
+      wobbleAmp: 0.15 + Math.random() * 0.25,
+      wobbleSpeed: 0.4 + Math.random() * 0.6,
+      wobblePhase: Math.random() * Math.PI * 2,
+    }),
+    [speed]
+  );
   useFrame((state) => {
     if (!ref.current) return;
-    ref.current.rotation.z = state.clock.getElapsedTime() * speed;
+    const t = state.clock.getElapsedTime();
+    ref.current.rotation.x = tilt[0] + t * motion.sx + Math.sin(t * motion.wobbleSpeed + motion.wobblePhase) * motion.wobbleAmp;
+    ref.current.rotation.y = tilt[1] + t * motion.sy + Math.cos(t * motion.wobbleSpeed * 0.8 + motion.wobblePhase) * motion.wobbleAmp;
+    ref.current.rotation.z = tilt[2] + t * motion.sz;
   });
   return (
-    <mesh ref={ref} rotation={tilt}>
+    <mesh ref={ref}>
       <torusGeometry args={[radius, thickness, 64, 256]} />
       <meshPhysicalMaterial
         color="#ffffff"
