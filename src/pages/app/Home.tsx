@@ -1,13 +1,16 @@
 import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { StatCard } from "@/components/app/StatCard";
-import { calls, bookings, stats } from "@/data/mock";
+import { calls, bookings, stats, leads, notifications } from "@/data/mock";
 import { fmtDay, fmtMoney, fmtRel, fmtTime } from "@/lib/format";
 import { Link } from "react-router-dom";
-import { ArrowRight, CalendarDays, Phone, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowRight, CalendarDays, Phone, Sparkles, TrendingUp, Clock, Users } from "lucide-react";
 
 const Home = () => {
   const recent = [...calls].sort((a, b) => +new Date(b.startedAt) - +new Date(a.startedAt)).slice(0, 3);
   const next = [...bookings].sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt))[0];
+  const newLeads = leads.filter((l) => l.status === "new" || l.status === "contacted").length;
+  const unread = notifications.filter((n) => !n.read).length;
+  const hoursSaved = (stats.minutesSaved / 60).toFixed(1);
 
   return (
     <AppShell>
@@ -28,7 +31,26 @@ const Home = () => {
           <div className="text-sm font-medium">Answering calls now</div>
           <div className="text-xs text-muted-foreground">{stats.callsToday} calls today · avg 1m 38s</div>
         </div>
+        {unread > 0 && (
+          <Link to="/notifications" className="text-[10px] px-2 py-1 rounded-full bg-primary/20 text-primary font-semibold">
+            {unread} new
+          </Link>
+        )}
       </div>
+
+      <Link
+        to="/analytics"
+        className="glass rounded-2xl p-4 mb-6 flex items-center gap-3 gradient-border hover:bg-secondary/40 transition-colors"
+      >
+        <span className="h-11 w-11 rounded-full bg-primary/20 text-primary flex items-center justify-center">
+          <Clock className="h-5 w-5" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold">Your AI saved you {hoursSaved} hours this week</div>
+          <div className="text-xs text-muted-foreground">≈ {fmtMoney(Number(hoursSaved) * 35)} in receptionist time</div>
+        </div>
+        <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+      </Link>
 
       <div className="grid grid-cols-2 gap-3 mb-8">
         <StatCard
@@ -45,16 +67,16 @@ const Home = () => {
           icon={<CalendarDays className="h-4 w-4" />}
         />
         <StatCard
-          label="SMS sent"
-          value={stats.smsSent}
-          hint="Confirmations + reminders"
-          icon={<Sparkles className="h-4 w-4" />}
+          label="New leads"
+          value={newLeads}
+          hint="In your pipeline"
+          icon={<Users className="h-4 w-4" />}
         />
         <StatCard
-          label="Time saved"
-          value={`${stats.minutesSaved}m`}
-          hint="No human in the loop"
-          icon={<TrendingUp className="h-4 w-4" />}
+          label="SMS sent"
+          value={stats.smsSent}
+          hint="Confirmations & replies"
+          icon={<Sparkles className="h-4 w-4" />}
         />
       </div>
 
