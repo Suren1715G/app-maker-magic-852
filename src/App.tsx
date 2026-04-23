@@ -8,6 +8,8 @@ import { DemoModeProvider } from "@/contexts/DemoModeContext";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { ProtectedRoute } from "@/components/app/ProtectedRoute";
 import { AdminRoute } from "@/components/app/AdminRoute";
+import { ReceptionistWidget } from "@/components/app/ReceptionistWidget";
+import { useAuth } from "@/contexts/AuthContext";
 import Auth from "./pages/auth/Auth";
 import ClaimCode from "./pages/auth/ClaimCode";
 import Home from "./pages/app/Home";
@@ -32,6 +34,14 @@ import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
 
+// Renders the AI receptionist widget once at the app root (above <Routes>),
+// so its WebRTC session survives navigation. Only visible to logged-in users.
+const PersistentReceptionist = () => {
+  const { user } = useAuth();
+  if (!user) return null;
+  return <ReceptionistWidget />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -41,6 +51,7 @@ const App = () => (
         <AuthProvider>
           <DemoModeProvider>
             <LocationProvider>
+              <PersistentReceptionist />
               <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/claim" element={<ClaimCode />} />
