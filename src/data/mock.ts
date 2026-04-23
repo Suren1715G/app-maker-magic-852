@@ -367,3 +367,33 @@ export const threads: SmsThread[] = [
     ],
   },
 ];
+
+/* ---------------- Locations ---------------- */
+export type Location = {
+  id: string;
+  name: string;
+  address: string;
+  callsToday: number;
+  bookingsToday: number;
+  isPrimary?: boolean;
+};
+export const locations: Location[] = [
+  { id: "loc1", name: "Downtown SF", address: "1 Market St, San Francisco", callsToday: 18, bookingsToday: 7, isPrimary: true },
+  { id: "loc2", name: "Oakland", address: "2200 Broadway, Oakland", callsToday: 11, bookingsToday: 4 },
+  { id: "loc3", name: "San Jose", address: "150 W Santa Clara, San Jose", callsToday: 9, bookingsToday: 3 },
+];
+
+/* ---------------- Session activity (security log) ---------------- */
+export type Session = {
+  id: string;
+  device: string;
+  location: string;
+  ip: string;
+  at: string;
+  current?: boolean;
+};
+export const sessions: Session[] = [
+  { id: "se1", device: "Chrome · macOS", location: "San Francisco, CA", ip: "73.158.xx.xx", at: iso(-2), current: true },
+  { id: "se2", device: "Safari · iPhone", location: "San Francisco, CA", ip: "73.158.xx.xx", at: iso(-60 * 12) },
+  { id: "se3", device: "Chrome · macOS", location: "San Francisco, CA", ip: "73.158.xx.xx", at: iso(-60 * 24 * 2) },
+];
