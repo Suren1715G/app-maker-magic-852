@@ -28,14 +28,14 @@ Deno.serve(async (req) => {
     if (!ELEVENLABS_AGENT_ID) throw new Error("ELEVENLABS_AGENT_ID not configured");
 
     const resp = await fetch(
-      `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${ELEVENLABS_AGENT_ID}`,
+      `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${ELEVENLABS_AGENT_ID}`,
       { headers: { "xi-api-key": ELEVENLABS_API_KEY } },
     );
 
     if (!resp.ok) {
       const t = await resp.text();
       console.error("ElevenLabs token error:", resp.status, t);
-      return new Response(JSON.stringify({ error: "Failed to mint token" }), {
+        return new Response(JSON.stringify({ error: "Failed to mint signed URL" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        token: data.token,
+        signedUrl: data.signed_url,
         agentId: ELEVENLABS_AGENT_ID,
         overrides,
         suggested,
