@@ -117,7 +117,7 @@ function ReceptionistWidgetInner() {
       await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const { data, error } = await supabase.functions.invoke("voice-token");
-      if (error || !data?.token) {
+      if (error || !data?.signedUrl) {
         console.error("Token error:", error, data);
         toast.error("Could not start call");
         return;
@@ -129,8 +129,7 @@ function ReceptionistWidgetInner() {
         typeof data.overrides === "object" &&
         Object.keys(data.overrides).length > 0;
       await conversation.startSession({
-        conversationToken: data.token,
-        connectionType: "webrtc",
+        signedUrl: data.signedUrl,
         ...(hasOverrides ? { overrides: data.overrides } : {}),
       });
     } catch (e) {
