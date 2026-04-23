@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AppShell, PageHeader } from "@/components/app/AppShell";
+import { MasterShell } from "@/components/master/MasterShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Copy, Loader2, Plus } from "lucide-react";
 
-type Company = { id: string; name: string; created_at: string };
+type Company = { id: string; name: string };
 type AccessCode = {
   id: string;
   code: string;
@@ -26,18 +26,18 @@ function generateCode(prefix = "SGS") {
   return `${prefix}-${rand(4)}-${rand(4)}`;
 }
 
-const Admin = () => {
+const MasterCodes = () => {
   const [companyName, setCompanyName] = useState("");
   const [notes, setNotes] = useState("");
   const [creating, setCreating] = useState(false);
-  const [companies, setCompanies] = useState<Company[]>([]);
   const [codes, setCodes] = useState<AccessCode[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
     const [{ data: cs }, { data: ks }] = await Promise.all([
-      supabase.from("companies").select("*").order("created_at", { ascending: false }),
+      supabase.from("companies").select("id, name").order("created_at", { ascending: false }),
       supabase
         .from("access_codes")
         .select("*, companies(name)")
@@ -89,10 +89,14 @@ const Admin = () => {
   };
 
   return (
-    <AppShell>
-      <PageHeader title="Admin" subtitle="Issue access codes to paying companies." />
-
-      <form onSubmit={handleCreate} className="glass rounded-2xl p-4 space-y-3 mb-6">
+    <MasterShell
+      title="Access codes"
+      subtitle={`${codes.length} issued · ${companies.length} companies`}
+    >
+      <form
+        onSubmit={handleCreate}
+        className="glass rounded-2xl p-5 grid md:grid-cols-[1fr_1fr_auto] gap-3 mb-8 items-end"
+      >
         <div className="space-y-1.5">
           <Label htmlFor="cname">Company name</Label>
           <Input
@@ -104,32 +108,29 @@ const Admin = () => {
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="notes">Notes (optional)</Label>
+          <Label htmlFor="notes">Notes</Label>
           <Input
             id="notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Stripe sub_xxx · Annual plan"
+            placeholder="Stripe sub_xxx · Annual"
           />
         </div>
-        <Button type="submit" className="w-full" disabled={creating}>
+        <Button type="submit" disabled={creating} className="md:w-auto">
           {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          Create company &amp; generate code
+          Generate
         </Button>
       </form>
 
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-        Access codes ({codes.length})
-      </h2>
       <div className="glass rounded-2xl divide-y divide-border/60 overflow-hidden">
         {loading && (
-          <div className="p-6 flex justify-center">
+          <div className="p-8 flex justify-center">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         )}
         {!loading && codes.length === 0 && (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            No codes yet. Create one above.
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            No codes yet. Generate one above.
           </div>
         )}
         {codes.map((c) => (
@@ -162,12 +163,8 @@ const Admin = () => {
           </div>
         ))}
       </div>
-
-      <p className="text-[11px] text-muted-foreground mt-6 text-center">
-        {companies.length} compan{companies.length === 1 ? "y" : "ies"} registered
-      </p>
-    </AppShell>
+    </MasterShell>
   );
 };
 
-export default Admin;
+export default MasterCodes;

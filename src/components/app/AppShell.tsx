@@ -1,10 +1,16 @@
 import { ReactNode } from "react";
 import { BottomNav } from "./BottomNav";
+import { DemoBanner } from "./DemoBanner";
+import { useDemoMode } from "@/contexts/DemoModeContext";
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { demoMode } = useDemoMode();
   return (
     <div className="min-h-screen w-full max-w-md mx-auto relative">
-      <main className="pb-28 safe-top px-5 animate-slide-up">{children}</main>
+      <DemoBanner />
+      <main className={`pb-28 safe-top px-5 animate-slide-up ${demoMode ? "pt-10" : ""}`}>
+        {children}
+      </main>
       <BottomNav />
     </div>
   );
