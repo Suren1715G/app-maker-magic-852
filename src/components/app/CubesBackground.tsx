@@ -119,9 +119,11 @@ function CubesScene() {
       <directionalLight position={[5, 5, 5]} intensity={0.8} color="#f0abfc" />
       <directionalLight position={[-5, -3, 2]} intensity={0.5} color="#60a5fa" />
       <pointLight position={[0, 0, 5]} intensity={0.6} color="#a855f7" />
-      {cubes.map((c, i) => (
-        <FloatingCube key={i} data={c} />
-      ))}
+      <ParallaxGroup strength={1}>
+        {cubes.map((c, i) => (
+          <FloatingCube key={i} data={c} />
+        ))}
+      </ParallaxGroup>
     </>
   );
 }
@@ -217,13 +219,15 @@ function OrbitsScene() {
       <pointLight position={[0, 0, 5]} intensity={1.2} color="#c026d3" />
       <pointLight position={[6, -3, 3]} intensity={0.8} color="#f97316" />
       <pointLight position={[-6, 3, 3]} intensity={0.8} color="#3b82f6" />
-      <OrbitalRing radius={5.5} tilt={[1.2, 0.3, 0.4]} color="#a855f7" speed={0.15} />
-      <OrbitalRing radius={6.8} tilt={[0.6, 1.1, -0.2]} color="#f97316" speed={-0.12} thickness={0.05} />
-      <OrbitalRing radius={4.2} tilt={[1.4, -0.5, 0.8]} color="#ec4899" speed={0.2} thickness={0.03} />
-      <OrbitalRing radius={8} tilt={[0.3, 0.8, 1.2]} color="#3b82f6" speed={-0.08} thickness={0.04} />
-      {minis.map((m, i) => (
-        <MiniCube key={i} {...m} />
-      ))}
+      <ParallaxGroup strength={1.2}>
+        <OrbitalRing radius={5.5} tilt={[1.2, 0.3, 0.4]} color="#a855f7" speed={0.15} />
+        <OrbitalRing radius={6.8} tilt={[0.6, 1.1, -0.2]} color="#f97316" speed={-0.12} thickness={0.05} />
+        <OrbitalRing radius={4.2} tilt={[1.4, -0.5, 0.8]} color="#ec4899" speed={0.2} thickness={0.03} />
+        <OrbitalRing radius={8} tilt={[0.3, 0.8, 1.2]} color="#3b82f6" speed={-0.08} thickness={0.04} />
+        {minis.map((m, i) => (
+          <MiniCube key={i} {...m} />
+        ))}
+      </ParallaxGroup>
     </>
   );
 }
@@ -290,7 +294,9 @@ function ParticlesScene() {
   return (
     <>
       <ambientLight intensity={0.6} />
-      <ParticleField />
+      <ParallaxGroup strength={0.6}>
+        <ParticleField />
+      </ParallaxGroup>
     </>
   );
 }
@@ -327,7 +333,9 @@ function PrismScene() {
       <ambientLight intensity={0.5} />
       <pointLight position={[5, 5, 5]} intensity={1.2} color="#ec4899" />
       <pointLight position={[-5, -3, 4]} intensity={1} color="#3b82f6" />
-      <PrismShape />
+      <ParallaxGroup strength={1.4}>
+        <PrismShape />
+      </ParallaxGroup>
       <CubesScene />
     </>
   );
@@ -349,6 +357,15 @@ export function CubesBackground() {
   const location = useLocation();
   const variant = pickVariant(location.pathname);
 
+  useEffect(() => {
+    const handle = (e: PointerEvent) => {
+      pointer.tx = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.ty = (e.clientY / window.innerHeight) * 2 - 1;
+    };
+    window.addEventListener("pointermove", handle);
+    return () => window.removeEventListener("pointermove", handle);
+  }, []);
+
   return (
     <div
       aria-hidden
@@ -367,6 +384,7 @@ export function CubesBackground() {
         gl={{ antialias: true, alpha: true }}
       >
         <Environment preset="night" background={false} />
+        <CameraRig />
         {variant === "cubes" && <CubesScene />}
         {variant === "orbits" && <OrbitsScene />}
         {variant === "particles" && <ParticlesScene />}
