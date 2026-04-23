@@ -15,6 +15,14 @@ import CallDetail from "./pages/app/CallDetail";
 import Calendar from "./pages/app/Calendar";
 import Sms from "./pages/app/Sms";
 import Settings from "./pages/app/Settings";
+import Leads from "./pages/app/Leads";
+import Reviews from "./pages/app/Reviews";
+import Analytics from "./pages/app/Analytics";
+import Notifications from "./pages/app/Notifications";
+import Billing from "./pages/app/Billing";
+import Referrals from "./pages/app/Referrals";
+import Support from "./pages/app/Support";
+import Assistant from "./pages/app/Assistant";
 import MasterOverview from "./pages/master/MasterOverview";
 import MasterCompanies from "./pages/master/MasterCompanies";
 import MasterCompanyDetail from "./pages/master/MasterCompanyDetail";
@@ -48,6 +56,14 @@ const App = () => (
               <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
               <Route path="/sms" element={<ProtectedRoute><Sms /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
+              <Route path="/reviews" element={<ProtectedRoute><Reviews /></ProtectedRoute>} />
+              <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+              <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+              <Route path="/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
+              <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
+              <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
+              <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
