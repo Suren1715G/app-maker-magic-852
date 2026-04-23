@@ -77,9 +77,9 @@ export function ReceptionistWidget() {
     const next = !muted;
     setMuted(next);
     try {
-      await conversation.setMicMuted?.(next);
+      conversation.setMuted?.(next);
     } catch {
-      // older SDK fallback: no-op
+      // no-op
     }
   }, [muted, conversation]);
 
