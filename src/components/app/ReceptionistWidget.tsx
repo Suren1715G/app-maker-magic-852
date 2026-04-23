@@ -12,6 +12,13 @@ import { cn } from "@/lib/utils";
 import { captureVisibleScreenAfterDelay } from "@/lib/screenContext";
 
 type Transcript = { id: string; role: "user" | "agent"; text: string };
+type VoiceTokenResponse = {
+  signedUrl?: string;
+  agentId?: string;
+  error?: string;
+  code?: string;
+  retryable?: boolean;
+};
 
 function isQuotaMessage(message?: string | null) {
   return /quota|credits? remaining|payment required|insufficient credits/i.test(message ?? "");
@@ -19,6 +26,9 @@ function isQuotaMessage(message?: string | null) {
 
 function getFriendlyVoiceError(message?: string | null) {
   if (!message) return "Call ended unexpectedly";
+  if (/missing (conversational ai )?permissions|convai_write|missing_permissions/i.test(message)) {
+    return "Voice is unavailable because the ElevenLabs API key is missing Conversational AI permissions (convai_write).";
+  }
   if (isQuotaMessage(message)) {
     return "Voice is unavailable because the ElevenLabs account has no remaining quota.";
   }
@@ -177,10 +187,12 @@ export function ReceptionistWidget() {
       await navigator.mediaDevices.getUserMedia({ audio: true });
       setCallError(null);
 
-      const { data, error } = await supabase.functions.invoke("voice-token");
+      const { data, error } = await supabase.functions.invoke<VoiceTokenResponse>("voice-token");
       if (error || !data?.signedUrl) {
         console.error("Token error:", error, data);
-        const friendlyMessage = getFriendlyVoiceError(error?.message ?? "Could not start call");
+        const friendlyMessage = getFriendlyVoiceError(
+          data?.error ?? error?.message ?? "Could not start call",
+        );
         setCallError(friendlyMessage);
         if (isQuotaMessage(friendlyMessage)) {
           setQuotaExceeded(true);
