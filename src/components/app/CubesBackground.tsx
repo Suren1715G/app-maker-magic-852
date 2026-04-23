@@ -24,6 +24,38 @@ const PALETTE = [
   "#a855f7", // light purple
 ];
 
+// Shared normalized mouse position (-1 to 1). Updated outside React to avoid re-renders.
+const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
+
+function CameraRig() {
+  useFrame((state) => {
+    // Smooth toward the latest pointer target.
+    pointer.x += (pointer.tx - pointer.x) * 0.05;
+    pointer.y += (pointer.ty - pointer.y) * 0.05;
+    const cam = state.camera;
+    cam.position.x = pointer.x * 1.6;
+    cam.position.y = -pointer.y * 1.2;
+    cam.lookAt(0, 0, 0);
+  });
+  return null;
+}
+
+function ParallaxGroup({
+  strength = 1,
+  children,
+}: {
+  strength?: number;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame(() => {
+    if (!ref.current) return;
+    ref.current.rotation.y = pointer.x * 0.25 * strength;
+    ref.current.rotation.x = -pointer.y * 0.18 * strength;
+  });
+  return <group ref={ref}>{children}</group>;
+}
+
 function FloatingCube({ data }: { data: CubeData }) {
   const ref = useRef<THREE.Mesh>(null);
   const baseY = data.position[1];
