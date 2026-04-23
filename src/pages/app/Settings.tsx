@@ -1,5 +1,5 @@
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { Bell, ExternalLink, Globe, LogOut, MessageSquare, Phone, Sparkles } from "lucide-react";
+import { Bell, ExternalLink, Globe, LogOut, MessageSquare, Phone, Shield, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -14,7 +14,7 @@ const rows = [
 ];
 
 const Settings = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -65,6 +65,25 @@ const Settings = () => {
         </div>
         <ExternalLink className="h-4 w-4 text-muted-foreground" />
       </a>
+
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={() => navigate("/admin")}
+          className="glass rounded-2xl p-4 flex items-center justify-between hover:bg-secondary/40 transition-colors mb-3 w-full text-left"
+        >
+          <div className="flex items-center gap-3">
+            <span className="h-9 w-9 rounded-full bg-primary/15 text-primary flex items-center justify-center">
+              <Shield className="h-4 w-4" />
+            </span>
+            <div>
+              <div className="font-medium">Admin panel</div>
+              <div className="text-xs text-muted-foreground">Issue access codes</div>
+            </div>
+          </div>
+          <ExternalLink className="h-4 w-4 text-muted-foreground" />
+        </button>
+      )}
 
       <Button type="button" variant="outline" className="w-full" onClick={handleSignOut}>
         <LogOut className="h-4 w-4" /> Sign out
