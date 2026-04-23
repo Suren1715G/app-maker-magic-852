@@ -159,6 +159,21 @@ const Auth = () => {
                     autoComplete="organization"
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="code">Access code</Label>
+                  <Input
+                    id="code"
+                    value={accessCode}
+                    onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
+                    placeholder="SGS-XXXX-XXXX"
+                    required
+                    autoComplete="off"
+                    className="font-mono tracking-wider"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Issued to your company after subscription. Required to create an account.
+                  </p>
+                </div>
               </>
             )}
             <div className="space-y-1.5">
