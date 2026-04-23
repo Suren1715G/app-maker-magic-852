@@ -3,8 +3,13 @@ import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { bookings, type Booking } from "@/data/mock";
 import { fmtTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock, MoreVertical, CalendarX, UserX, CalendarClock, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 type View = "month" | "week" | "day";
 
@@ -35,10 +40,22 @@ const Calendar = () => {
   const [cursor, setCursor] = useState<Date>(startOfDay(today));
   const [view, setView] = useState<View>("month");
   const [selected, setSelected] = useState<Date>(startOfDay(today));
+  const [items, setItems] = useState<Booking[]>(bookings);
+  const [scope, setScope] = useState<"upcoming" | "past" | "all">("all");
+
+  const filtered = useMemo(() => {
+    const now = Date.now();
+    return items.filter((b) => {
+      const t = +new Date(b.startsAt);
+      if (scope === "upcoming") return t >= now;
+      if (scope === "past") return t < now;
+      return true;
+    });
+  }, [items, scope]);
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, Booking[]>();
-    for (const b of bookings) {
+    for (const b of filtered) {
       const k = startOfDay(new Date(b.startsAt)).toISOString();
       const arr = map.get(k) ?? [];
       arr.push(b);
@@ -48,9 +65,25 @@ const Calendar = () => {
       arr.sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
     }
     return map;
-  }, []);
+  }, [filtered]);
 
   const eventsFor = (d: Date) => eventsByDay.get(startOfDay(d).toISOString()) ?? [];
+
+  const updateStatus = (id: string, status: NonNullable<Booking["status"]>) => {
+    setItems((p) => p.map((b) => (b.id === id ? { ...b, status } : b)));
+    toast.success(
+      status === "cancelled" ? "Booking cancelled" :
+      status === "no-show" ? "Marked as no-show" :
+      status === "completed" ? "Marked completed" : "Updated"
+    );
+  };
+
+  const reschedule = (b: Booking) => {
+    const next = new Date(b.startsAt);
+    next.setDate(next.getDate() + 1);
+    setItems((p) => p.map((x) => (x.id === b.id ? { ...x, startsAt: next.toISOString() } : x)));
+    toast.success(`Moved to ${next.toLocaleDateString()} ${fmtTime(next.toISOString())}`);
+  };
 
   const navigate = (dir: -1 | 0 | 1) => {
     if (dir === 0) {
@@ -82,7 +115,40 @@ const Calendar = () => {
 
   return (
     <AppShell>
-      <PageHeader title="Calendar" subtitle="Bookings synced to Google Calendar." />
+      <PageHeader
+        title="Calendar"
+        subtitle="Bookings synced to Google Calendar."
+        right={
+          <Badge variant="secondary" className="gap-1.5">
+            <Link2 className="h-3 w-3 text-success" /> Google synced
+          </Badge>
+        }
+      />
+
+      <div className="flex gap-2 mb-3">
+        {(["all", "upcoming", "past"] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => setScope(s)}
+            className={cn(
+              "px-3 py-1 rounded-full text-xs font-medium capitalize border transition-colors",
+              scope === s
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-secondary/50 text-muted-foreground border-border hover:text-foreground"
+            )}
+          >
+            {s}
+          </button>
+        ))}
+        {(() => {
+          const noShows = items.filter((b) => b.status === "no-show").length;
+          return noShows > 0 ? (
+            <span className="ml-auto text-[11px] text-muted-foreground self-center">
+              {noShows} no-show{noShows > 1 ? "s" : ""} this period
+            </span>
+          ) : null;
+        })()}
+      </div>
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -129,7 +195,12 @@ const Calendar = () => {
       {view === "day" && <DayView day={cursor} events={eventsFor(cursor)} />}
 
       {view === "month" && (
-        <DayDetail day={selected} events={eventsFor(selected)} />
+        <DayDetail
+          day={selected}
+          events={eventsFor(selected)}
+          onReschedule={reschedule}
+          onStatus={updateStatus}
+        />
       )}
     </AppShell>
   );
@@ -320,7 +391,14 @@ const DayView = ({ day, events }: { day: Date; events: Booking[] }) => {
 };
 
 /* ---------- Detail under month ---------- */
-const DayDetail = ({ day, events }: { day: Date; events: Booking[] }) => (
+const DayDetail = ({
+  day, events, onReschedule, onStatus,
+}: {
+  day: Date;
+  events: Booking[];
+  onReschedule: (b: Booking) => void;
+  onStatus: (id: string, s: NonNullable<Booking["status"]>) => void;
+}) => (
   <section className="mt-6">
     <div className="flex items-baseline gap-2 mb-3">
       <h3 className="font-display text-base font-semibold">
@@ -341,7 +419,12 @@ const DayDetail = ({ day, events }: { day: Date; events: Booking[] }) => (
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-medium truncate">{b.customer}</div>
+              <div className="flex items-center gap-2">
+                <div className="font-medium truncate">{b.customer}</div>
+                {b.status === "cancelled" && <Badge variant="outline" className="text-[10px] py-0">Cancelled</Badge>}
+                {b.status === "no-show" && <Badge className="bg-accent text-accent-foreground text-[10px] py-0">No-show</Badge>}
+                {b.status === "completed" && <Badge className="bg-success text-success-foreground text-[10px] py-0">Done</Badge>}
+              </div>
               <div className="text-sm text-muted-foreground truncate">{b.service}</div>
               <div className="flex items-center gap-1 mt-2 text-xs">
                 {b.smsConfirmed ? (
@@ -353,6 +436,31 @@ const DayDetail = ({ day, events }: { day: Date; events: Booking[] }) => (
                 )}
               </div>
             </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 self-start">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => onReschedule(b)}>
+                  <CalendarClock className="h-4 w-4" /> Reschedule (+1d)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onStatus(b.id, "completed")}>
+                  <CheckCircle2 className="h-4 w-4" /> Mark completed
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onStatus(b.id, "no-show")}>
+                  <UserX className="h-4 w-4" /> Mark no-show
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onStatus(b.id, "cancelled")}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <CalendarX className="h-4 w-4" /> Cancel booking
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </li>
         ))}
       </ul>

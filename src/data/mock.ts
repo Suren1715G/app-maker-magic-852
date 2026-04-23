@@ -20,6 +20,7 @@ export type Booking = {
   durationMin: number;
   phone: string;
   smsConfirmed: boolean;
+  status?: "scheduled" | "completed" | "cancelled" | "no-show";
 };
 
 export type SmsLog = {
