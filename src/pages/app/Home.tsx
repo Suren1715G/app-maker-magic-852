@@ -1,0 +1,125 @@
+import { AppShell, PageHeader } from "@/components/app/AppShell";
+import { StatCard } from "@/components/app/StatCard";
+import { calls, bookings, stats } from "@/data/mock";
+import { fmtDay, fmtMoney, fmtRel, fmtTime } from "@/lib/format";
+import { Link } from "react-router-dom";
+import { ArrowRight, CalendarDays, Phone, Sparkles, TrendingUp } from "lucide-react";
+
+const Home = () => {
+  const recent = [...calls].sort((a, b) => +new Date(b.startedAt) - +new Date(a.startedAt)).slice(0, 3);
+  const next = [...bookings].sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt))[0];
+
+  return (
+    <AppShell>
+      <header className="pt-4 pb-6">
+        <span className="text-muted-foreground text-sm block">Welcome back</span>
+        <h1 className="font-display text-4xl font-semibold leading-none mt-1">
+          <span className="prism-text">SGS</span>
+        </h1>
+        <p className="text-sm text-muted-foreground mt-2">Your AI receptionist is on the line.</p>
+      </header>
+
+      <div className="glass rounded-2xl p-4 flex items-center gap-3 mb-6">
+        <span className="relative flex h-3 w-3">
+          <span className="animate-pulse-glow absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-success" />
+        </span>
+        <div className="flex-1">
+          <div className="text-sm font-medium">Answering calls now</div>
+          <div className="text-xs text-muted-foreground">{stats.callsToday} calls today · avg 1m 38s</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-8">
+        <StatCard
+          label="Calls today"
+          value={stats.callsToday}
+          hint={`${Math.round(stats.conversionRate * 100)}% booked`}
+          icon={<Phone className="h-4 w-4" />}
+          accent
+        />
+        <StatCard
+          label="Bookings"
+          value={stats.bookingsToday}
+          hint={fmtMoney(stats.revenueBookedToday) + " booked"}
+          icon={<CalendarDays className="h-4 w-4" />}
+        />
+        <StatCard
+          label="SMS sent"
+          value={stats.smsSent}
+          hint="Confirmations + reminders"
+          icon={<Sparkles className="h-4 w-4" />}
+        />
+        <StatCard
+          label="Time saved"
+          value={`${stats.minutesSaved}m`}
+          hint="No human in the loop"
+          icon={<TrendingUp className="h-4 w-4" />}
+        />
+      </div>
+
+      {next && (
+        <section className="mb-8">
+          <SectionTitle title="Next booking" to="/calendar" />
+          <Link
+            to="/calendar"
+            className="glass rounded-2xl p-4 flex items-center gap-4 hover:bg-secondary/40 transition-colors"
+          >
+            <div className="flex flex-col items-center justify-center bg-primary/15 rounded-xl px-3 py-2 min-w-[72px]">
+              <div className="text-[10px] uppercase tracking-wider text-primary">{fmtDay(next.startsAt)}</div>
+              <div className="font-display text-lg font-semibold">{fmtTime(next.startsAt)}</div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium truncate">{next.customer}</div>
+              <div className="text-sm text-muted-foreground truncate">
+                {next.service} · {next.durationMin}m
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+          </Link>
+        </section>
+      )}
+
+      <section>
+        <SectionTitle title="Recent calls" to="/calls" />
+        <ul className="space-y-2">
+          {recent.map((c) => (
+            <li key={c.id}>
+              <Link
+                to={`/calls/${c.id}`}
+                className="glass rounded-2xl p-4 flex items-center gap-3 hover:bg-secondary/40 transition-colors"
+              >
+                <span
+                  className={
+                    "h-2 w-2 rounded-full shrink-0 " +
+                    (c.status === "booked"
+                      ? "bg-success"
+                      : c.status === "missed-followup"
+                      ? "bg-accent"
+                      : "bg-primary")
+                  }
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{c.caller}</div>
+                  <div className="text-xs text-muted-foreground truncate">{c.summary}</div>
+                </div>
+                <div className="text-xs text-muted-foreground shrink-0">{fmtRel(c.startedAt)}</div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </AppShell>
+  );
+};
+
+const SectionTitle = ({ title, to }: { title: string; to: string }) => (
+  <div className="flex items-center justify-between mb-3">
+    <h2 className="font-display text-lg font-semibold">{title}</h2>
+    <Link to={to} className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
+      View all <ArrowRight className="h-3 w-3" />
+    </Link>
+  </div>
+);
+
+export default Home;
