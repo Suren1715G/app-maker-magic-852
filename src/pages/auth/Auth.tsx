@@ -26,6 +26,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [businessName, setBusinessName] = useState("");
+  const [accessCode, setAccessCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -51,6 +52,9 @@ const Auth = () => {
     setSubmitting(true);
     try {
       if (mode === "signup") {
+        if (!accessCode.trim()) {
+          throw new Error("An access code is required to create an account.");
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -59,6 +63,7 @@ const Auth = () => {
             data: {
               display_name: displayName || null,
               business_name: businessName || null,
+              access_code: accessCode.trim(),
             },
           },
         });
