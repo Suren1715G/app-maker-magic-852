@@ -1,13 +1,16 @@
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { referrals } from "@/data/mock";
+import { referrals as mockReferrals } from "@/data/mock";
 import { Copy, Gift, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 
 const link = "https://sgs.ai/r/sgs-marcus";
 
 const Referrals = () => {
+  const isNew = useIsNewCustomer();
+  const referrals = isNew ? [] : mockReferrals;
   const earned = referrals.filter((r) => r.status === "joined").length;
 
   const copy = async () => {

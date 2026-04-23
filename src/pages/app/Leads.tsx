@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { leads, type Lead, type LeadStatus } from "@/data/mock";
+import { leads as mockLeads, type Lead, type LeadStatus } from "@/data/mock";
 import { fmtMoney, fmtRel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Phone, MessageSquare, Globe, ChevronRight, X } from "lucide-react";
+import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 
 const cols: { id: LeadStatus; label: string; tone: string }[] = [
   { id: "new", label: "New", tone: "text-primary" },
@@ -16,7 +17,8 @@ const sourceIcon = (s: Lead["source"]) =>
   s === "call" ? Phone : s === "sms" ? MessageSquare : Globe;
 
 const Leads = () => {
-  const [data, setData] = useState<Lead[]>(leads);
+  const isNew = useIsNewCustomer();
+  const [data, setData] = useState<Lead[]>(isNew ? [] : mockLeads);
   const [active, setActive] = useState<Lead | null>(null);
   const [draftNote, setDraftNote] = useState("");
 
