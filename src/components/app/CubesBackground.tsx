@@ -1,6 +1,7 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
+import { useLocation } from "react-router-dom";
 
 type CubeData = {
   position: [number, number, number];
@@ -50,7 +51,7 @@ function FloatingCube({ data }: { data: CubeData }) {
   );
 }
 
-function Scene() {
+function CubesScene() {
   const cubes = useMemo<CubeData[]>(() => {
     const arr: CubeData[] = [];
     const count = 22;
@@ -90,7 +91,214 @@ function Scene() {
   );
 }
 
+function OrbitalRing({
+  radius,
+  tilt,
+  color,
+  speed,
+  thickness = 0.04,
+}: {
+  radius: number;
+  tilt: [number, number, number];
+  color: string;
+  speed: number;
+  thickness?: number;
+}) {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame((state) => {
+    if (!ref.current) return;
+    ref.current.rotation.z = state.clock.getElapsedTime() * speed;
+  });
+  return (
+    <mesh ref={ref} rotation={tilt}>
+      <torusGeometry args={[radius, thickness, 16, 128]} />
+      <meshStandardMaterial
+        color={color}
+        emissive={color}
+        emissiveIntensity={1.4}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
+function MiniCube({
+  position,
+  scale,
+  color,
+  speed,
+}: {
+  position: [number, number, number];
+  scale: number;
+  color: string;
+  speed: number;
+}) {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame((state) => {
+    if (!ref.current) return;
+    const t = state.clock.getElapsedTime();
+    ref.current.rotation.x = t * speed;
+    ref.current.rotation.y = t * speed * 0.7;
+    ref.current.position.y = position[1] + Math.sin(t * 0.6 + position[0]) * 0.3;
+  });
+  return (
+    <mesh ref={ref} position={position} scale={scale}>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} />
+    </mesh>
+  );
+}
+
+function OrbitsScene() {
+  const minis = useMemo(
+    () =>
+      Array.from({ length: 14 }).map((_, i) => ({
+        position: [
+          (Math.random() - 0.5) * 14,
+          (Math.random() - 0.5) * 8,
+          (Math.random() - 0.5) * 4,
+        ] as [number, number, number],
+        scale: 0.25 + Math.random() * 0.5,
+        color: PALETTE[i % PALETTE.length],
+        speed: 0.3 + Math.random() * 0.6,
+      })),
+    []
+  );
+  return (
+    <>
+      <ambientLight intensity={0.5} />
+      <pointLight position={[0, 0, 5]} intensity={1.2} color="#c026d3" />
+      <pointLight position={[6, -3, 3]} intensity={0.8} color="#f97316" />
+      <pointLight position={[-6, 3, 3]} intensity={0.8} color="#3b82f6" />
+      <OrbitalRing radius={5.5} tilt={[1.2, 0.3, 0.4]} color="#a855f7" speed={0.15} />
+      <OrbitalRing radius={6.8} tilt={[0.6, 1.1, -0.2]} color="#f97316" speed={-0.12} thickness={0.05} />
+      <OrbitalRing radius={4.2} tilt={[1.4, -0.5, 0.8]} color="#ec4899" speed={0.2} thickness={0.03} />
+      <OrbitalRing radius={8} tilt={[0.3, 0.8, 1.2]} color="#3b82f6" speed={-0.08} thickness={0.04} />
+      {minis.map((m, i) => (
+        <MiniCube key={i} {...m} />
+      ))}
+    </>
+  );
+}
+
+function ParticleField() {
+  const ref = useRef<THREE.Points>(null);
+  const { positions, colors } = useMemo(() => {
+    const count = 600;
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
+    const palette = [
+      new THREE.Color("#c026d3"),
+      new THREE.Color("#3b82f6"),
+      new THREE.Color("#f97316"),
+      new THREE.Color("#a855f7"),
+    ];
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 24;
+      pos[i * 3 + 1] = (Math.random() - 0.5) * 16;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 10;
+      const c = palette[Math.floor(Math.random() * palette.length)];
+      col[i * 3] = c.r;
+      col[i * 3 + 1] = c.g;
+      col[i * 3 + 2] = c.b;
+    }
+    return { positions: pos, colors: col };
+  }, []);
+
+  useFrame((state) => {
+    if (!ref.current) return;
+    ref.current.rotation.y = state.clock.getElapsedTime() * 0.04;
+    ref.current.rotation.x = Math.sin(state.clock.getElapsedTime() * 0.1) * 0.1;
+  });
+
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={positions.length / 3}
+          array={positions}
+          itemSize={3}
+        />
+        <bufferAttribute
+          attach="attributes-color"
+          count={colors.length / 3}
+          array={colors}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.08}
+        vertexColors
+        transparent
+        opacity={0.9}
+        sizeAttenuation
+        depthWrite={false}
+      />
+    </points>
+  );
+}
+
+function ParticlesScene() {
+  return (
+    <>
+      <ambientLight intensity={0.6} />
+      <ParticleField />
+    </>
+  );
+}
+
+function PrismShape() {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame((state) => {
+    if (!ref.current) return;
+    const t = state.clock.getElapsedTime();
+    ref.current.rotation.x = t * 0.15;
+    ref.current.rotation.y = t * 0.2;
+  });
+  return (
+    <mesh ref={ref}>
+      <icosahedronGeometry args={[3, 0]} />
+      <meshStandardMaterial
+        color="#a855f7"
+        emissive="#c026d3"
+        emissiveIntensity={0.4}
+        metalness={0.9}
+        roughness={0.15}
+        wireframe
+      />
+    </mesh>
+  );
+}
+
+function PrismScene() {
+  return (
+    <>
+      <ambientLight intensity={0.5} />
+      <pointLight position={[5, 5, 5]} intensity={1.2} color="#ec4899" />
+      <pointLight position={[-5, -3, 4]} intensity={1} color="#3b82f6" />
+      <PrismShape />
+      <CubesScene />
+    </>
+  );
+}
+
+type Variant = "cubes" | "orbits" | "particles" | "prism";
+
+function pickVariant(pathname: string): Variant {
+  if (pathname === "/" || pathname.startsWith("/calls")) return "cubes";
+  if (pathname.startsWith("/calendar") || pathname.startsWith("/leads")) return "orbits";
+  if (pathname.startsWith("/sms") || pathname.startsWith("/notifications")) return "particles";
+  if (pathname.startsWith("/analytics") || pathname.startsWith("/reviews") || pathname.startsWith("/assistant"))
+    return "prism";
+  // default for billing/referrals/support/settings
+  return "cubes";
+}
+
 export function CubesBackground() {
+  const location = useLocation();
+  const variant = pickVariant(location.pathname);
+
   return (
     <div
       aria-hidden
@@ -103,11 +311,15 @@ export function CubesBackground() {
       }}
     >
       <Canvas
+        key={variant}
         camera={{ position: [0, 0, 10], fov: 55 }}
         dpr={[1, 1.5]}
         gl={{ antialias: true, alpha: true }}
       >
-        <Scene />
+        {variant === "cubes" && <CubesScene />}
+        {variant === "orbits" && <OrbitsScene />}
+        {variant === "particles" && <ParticlesScene />}
+        {variant === "prism" && <PrismScene />}
       </Canvas>
     </div>
   );
