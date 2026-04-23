@@ -136,15 +136,16 @@ export function ReceptionistWidget() {
       navigate(match.path);
       toast.success(`Opening ${match.label}`);
 
-      const snapshot = await captureVisibleScreenAfterDelay(900, 5000);
+      const snapshot = await captureVisibleScreenAfterDelay(1200, 6000);
       return [
-        `Navigated to ${match.label}.`,
-        `Path: ${snapshot.path}`,
-        snapshot.title ? `Title: ${snapshot.title}` : null,
-        `Visible content: ${snapshot.content || "No readable content found on the page."}`,
-        "Answer the user using this visible page content.",
+        `Navigated to ${match.label} (path: ${snapshot.path}).`,
+        "IMPORTANT: The block below is the ONLY source of truth for what is currently on the user's screen.",
+        "Do NOT invent numbers, names, counts, or items that are not literally present in this block.",
+        "If the user asks about something not shown here, say you don't see it on the current screen.",
+        "----- BEGIN VISIBLE SCREEN -----",
+        snapshot.content || "(No readable content found on the page.)",
+        "----- END VISIBLE SCREEN -----",
       ]
-        .filter(Boolean)
         .join("\n");
     },
   );
@@ -152,9 +153,21 @@ export function ReceptionistWidget() {
   // Tool: read the page the user is currently on
   useConversationClientTool("get_current_screen", async () => {
     try {
-      return JSON.stringify(await captureVisibleScreenAfterDelay(500, 5000));
+      const snapshot = await captureVisibleScreenAfterDelay(500, 6000);
+      return [
+        "IMPORTANT: The block below is the ONLY source of truth for what is currently on the user's screen.",
+        "Do NOT invent numbers, names, counts, or items not literally present in this block.",
+        "If the user asks about something not shown here, say you don't see it on the current screen.",
+        `Path: ${snapshot.path}`,
+        snapshot.title ? `Title: ${snapshot.title}` : "",
+        "----- BEGIN VISIBLE SCREEN -----",
+        snapshot.content || "(No readable content found on the page.)",
+        "----- END VISIBLE SCREEN -----",
+      ]
+        .filter(Boolean)
+        .join("\n");
     } catch {
-      return JSON.stringify({ error: "Could not read screen" });
+      return "Error: Could not read screen. Tell the user you can't see the page right now.";
     }
   });
 
