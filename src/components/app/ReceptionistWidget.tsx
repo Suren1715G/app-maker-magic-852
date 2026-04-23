@@ -90,8 +90,12 @@ function ReceptionistWidgetInner() {
       setMuted(false);
     },
     onError: (err: unknown) => {
-      console.error("Voice error:", err);
-      toast.error("Voice connection error");
+      // ElevenLabs occasionally emits a malformed error event right after the
+      // first agent reply (missing the inner `error` payload). Logging it is
+      // enough — surfacing a toast + tearing the call down made it look like
+      // the call was instantly ending. The SDK will disconnect on its own if
+      // it's truly fatal.
+      console.warn("Voice error event:", err);
     },
     onMessage: (msg: { source: "user" | "ai"; message: string }) => {
       if (!msg?.message) return;
@@ -170,10 +174,14 @@ function ReceptionistWidgetInner() {
       }
 
       setTranscripts([]);
+      const hasOverrides =
+        data.overrides &&
+        typeof data.overrides === "object" &&
+        Object.keys(data.overrides).length > 0;
       await conversation.startSession({
         conversationToken: data.token,
         connectionType: "webrtc",
-        overrides: data.overrides ?? undefined,
+        ...(hasOverrides ? { overrides: data.overrides } : {}),
       });
     } catch (e) {
       console.error(e);
