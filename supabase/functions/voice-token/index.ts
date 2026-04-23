@@ -3,6 +3,21 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const BASE_AGENT_PROMPT = `You are an AI receptionist inside a live business dashboard.
+
+You have two app tools available:
+- navigate_to({ destination }) to move to another page in the app.
+- get_current_screen() to read the user's currently visible page.
+
+The app may also send SCREEN_CONTEXT_UPDATE messages. Treat those as the exact live screen currently visible to the user.
+
+Rules:
+1. If the user asks about calls, messages, calendar, leads, reviews, analytics, billing, referrals, support, settings, or any business metric, use the visible screen content to answer directly.
+2. If the answer is on another page, navigate there yourself, read the screen, and then answer with the actual numbers or facts you found.
+3. Never tell the user that the information must be visible if you already received screen content from get_current_screen() or SCREEN_CONTEXT_UPDATE.
+4. Never ask the user to click to another page first if you can navigate there yourself.
+5. Keep answers short, direct, and spoken like a live receptionist on a call.`;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -27,8 +42,10 @@ Deno.serve(async (req) => {
     }
 
     const data = await resp.json();
+    let companyPrompt: string | null = null;
+    let firstMessage: string | null = null;
+    let voiceId: string | null = null;
     // Try to load the caller's company AI customization (best-effort).
-    let overrides: Record<string, unknown> | null = null;
     try {
       const authHeader = req.headers.get("Authorization") ?? "";
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -54,19 +71,11 @@ Deno.serve(async (req) => {
               .maybeSingle();
             if (company) {
               const businessName = profile.business_name || company.name;
-              const agent: Record<string, unknown> = {};
-              if (company.ai_system_prompt) {
-                agent.prompt = { prompt: company.ai_system_prompt };
-              }
-              if (company.ai_first_message) {
-                agent.firstMessage = company.ai_first_message
-                  .replaceAll("{business}", businessName ?? "");
-              }
-              const tts: Record<string, unknown> = {};
-              if (company.ai_voice_id) tts.voiceId = company.ai_voice_id;
-              overrides = {};
-              if (Object.keys(agent).length) (overrides as any).agent = agent;
-              if (Object.keys(tts).length) (overrides as any).tts = tts;
+              companyPrompt = company.ai_system_prompt;
+              firstMessage = company.ai_first_message
+                ? company.ai_first_message.replaceAll("{business}", businessName ?? "")
+                : null;
+              voiceId = company.ai_voice_id;
             }
           }
         }
@@ -74,6 +83,18 @@ Deno.serve(async (req) => {
     } catch (e) {
       console.error("voice-token overrides lookup failed:", e);
     }
+
+    const prompt = companyPrompt
+      ? `${BASE_AGENT_PROMPT}\n\nBusiness-specific instructions:\n${companyPrompt}`
+      : BASE_AGENT_PROMPT;
+
+    const overrides: Record<string, unknown> = {
+      agent: {
+        prompt: { prompt },
+        ...(firstMessage ? { firstMessage } : {}),
+      },
+      ...(voiceId ? { tts: { voiceId } } : {}),
+    };
 
     return new Response(
       JSON.stringify({ token: data.token, agentId: ELEVENLABS_AGENT_ID, overrides }),

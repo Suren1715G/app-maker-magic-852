@@ -1,10 +1,15 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Mic, MicOff, PhoneOff, Phone, Sparkles, X, Loader2 } from "lucide-react";
 import { useConversation, ConversationProvider } from "@elevenlabs/react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  captureVisibleScreen,
+  captureVisibleScreenAfterDelay,
+  formatVisibleScreenContext,
+} from "@/lib/screenContext";
 
 type Transcript = { id: string; role: "user" | "agent"; text: string };
 
@@ -35,11 +40,16 @@ const NAV_DESTINATIONS: Record<string, { path: string; label: string }> = {
 
 function ReceptionistWidgetInner() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [muted, setMuted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
+  const screenContextHashRef = useRef("");
+  const pushScreenContextRef = useRef<
+    (reason?: string, options?: { delayMs?: number; force?: boolean }) => Promise<void>
+  >(async () => {});
 
   const conversation = useConversation({
     clientTools: {
@@ -54,22 +64,21 @@ function ReceptionistWidgetInner() {
         }
         navigate(match.path);
         toast.success(`Opening ${match.label}`);
+        window.setTimeout(() => {
+          void pushScreenContextRef.current(`The app navigated to ${match.label}.`, {
+            delayMs: 0,
+            force: true,
+          });
+        }, 900);
         // Keep the widget open so the call stays visible and active.
-        return `Navigated to ${match.label}. The new page is now loading.`;
+        return `Navigated to ${match.label}. I am reading the page now and will answer using what is visible on screen.`;
       },
       // Agent calls this to read whatever page the user is currently on.
       // Returns the route + visible text content so the AI can answer
       // questions like "how many calls today?" based on what's on screen.
       get_current_screen: async () => {
-        // Wait a beat so any in-flight navigation/render finishes before we read.
-        await new Promise((r) => setTimeout(r, 600));
         try {
-          const path = window.location.pathname;
-          const title = document.title;
-          const main = document.querySelector("main") ?? document.body;
-          const raw = (main as HTMLElement).innerText ?? "";
-          const text = raw.replace(/\s+/g, " ").trim().slice(0, 4000);
-          return JSON.stringify({ path, title, content: text });
+          return JSON.stringify(await captureVisibleScreenAfterDelay(700, 5000));
         } catch {
           return JSON.stringify({ error: "Could not read screen" });
         }
@@ -90,12 +99,56 @@ function ReceptionistWidgetInner() {
         ...p,
         { id: crypto.randomUUID(), role: msg.source === "user" ? "user" : "agent", text: msg.message },
       ]);
+      if (msg.source === "user") {
+        void pushScreenContextRef.current("The user just asked about the currently visible app screen.", {
+          delayMs: 120,
+          force: true,
+        });
+      }
     },
   });
 
   const status = conversation.status;
   const isConnected = status === "connected";
   const isSpeaking = conversation.isSpeaking;
+
+  const pushScreenContext = useCallback(
+    async (
+      reason = "The visible app screen changed.",
+      options?: { delayMs?: number; force?: boolean },
+    ) => {
+      const delayMs = options?.delayMs ?? 300;
+      if (delayMs > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+      }
+
+      const snapshot = captureVisibleScreen();
+      const signature = `${snapshot.path}::${snapshot.title}::${snapshot.content}`;
+      if (!options?.force && signature === screenContextHashRef.current) return;
+
+      screenContextHashRef.current = signature;
+
+      try {
+        await conversation.sendContextualUpdate?.(formatVisibleScreenContext(snapshot, reason));
+      } catch (error) {
+        console.error("Failed to push screen context:", error);
+      }
+    },
+    [conversation],
+  );
+
+  useEffect(() => {
+    pushScreenContextRef.current = pushScreenContext;
+  }, [pushScreenContext]);
+
+  useEffect(() => {
+    if (!isConnected) {
+      screenContextHashRef.current = "";
+      return;
+    }
+
+    void pushScreenContext("The user is currently viewing this page.", { delayMs: 250, force: true });
+  }, [isConnected, location.pathname, location.search, pushScreenContext]);
 
   // Call timer
   useEffect(() => {
