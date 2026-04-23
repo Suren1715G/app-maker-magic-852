@@ -84,20 +84,26 @@ Deno.serve(async (req) => {
       console.error("voice-token overrides lookup failed:", e);
     }
 
-    const prompt = companyPrompt
-      ? `${BASE_AGENT_PROMPT}\n\nBusiness-specific instructions:\n${companyPrompt}`
-      : BASE_AGENT_PROMPT;
-
-    const overrides: Record<string, unknown> = {
-      agent: {
-        prompt: { prompt },
-        ...(firstMessage ? { firstMessage } : {}),
-      },
-      ...(voiceId ? { tts: { voiceId } } : {}),
-    };
+    // We intentionally do NOT send agent prompt/firstMessage/voice overrides
+    // by default. The ElevenLabs agent has to explicitly allow each override
+    // field, and sending one that isn't allowed makes the SDK crash the call
+    // right after connecting. Configure the system prompt + first message
+    // directly on the ElevenLabs agent instead.
+    const overrides: Record<string, unknown> = {};
+    // Surface the values we *would* override so the client/agent owner can
+    // see what's configured without us actually applying them.
+    const suggested: Record<string, unknown> = {};
+    if (companyPrompt) suggested.systemPrompt = companyPrompt;
+    if (firstMessage) suggested.firstMessage = firstMessage;
+    if (voiceId) suggested.voiceId = voiceId;
 
     return new Response(
-      JSON.stringify({ token: data.token, agentId: ELEVENLABS_AGENT_ID, overrides }),
+      JSON.stringify({
+        token: data.token,
+        agentId: ELEVENLABS_AGENT_ID,
+        overrides,
+        suggested,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
