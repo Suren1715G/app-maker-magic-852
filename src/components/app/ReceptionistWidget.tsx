@@ -1,6 +1,11 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Mic, MicOff, PhoneOff, Phone, Sparkles, X, Loader2 } from "lucide-react";
-import { useConversation, ConversationProvider } from "@elevenlabs/react";
+import {
+  useConversation,
+  ConversationProvider,
+  useConversationClientTool,
+  type DisconnectionDetails,
+} from "@elevenlabs/react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -41,63 +46,65 @@ function ReceptionistWidgetInner() {
   const [muted, setMuted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
+  const disconnectToastShownRef = useRef(false);
 
   const conversation = useConversation({
-    clientTools: {
-      // Agent calls this to navigate the user inside the app.
-      navigate_to: async (params: { destination?: string }) => {
-        const key = (params?.destination ?? "").toLowerCase().trim();
-        const match = NAV_DESTINATIONS[key];
-        if (!match) {
-          return `Unknown destination "${params?.destination}". Available: ${Object.keys(
-            NAV_DESTINATIONS,
-          ).join(", ")}`;
-        }
-        navigate(match.path);
-        toast.success(`Opening ${match.label}`);
-
-        const snapshot = await captureVisibleScreenAfterDelay(900, 5000);
-        return [
-          `Navigated to ${match.label}.`,
-          `Path: ${snapshot.path}`,
-          snapshot.title ? `Title: ${snapshot.title}` : null,
-          `Visible content: ${snapshot.content || "No readable content found on the page."}`,
-          "Answer the user using this visible page content.",
-        ]
-          .filter(Boolean)
-          .join("\n");
-      },
-      // Agent calls this to read whatever page the user is currently on.
-      // Returns the route + visible text content so the AI can answer
-      // questions like "how many calls today?" based on what's on screen.
-      get_current_screen: async () => {
-        try {
-          return JSON.stringify(await captureVisibleScreenAfterDelay(700, 5000));
-        } catch {
-          return JSON.stringify({ error: "Could not read screen" });
-        }
-      },
-    },
     onConnect: () => toast.success("Connected to your AI receptionist"),
-    onDisconnect: () => {
+    onDisconnect: (details?: DisconnectionDetails) => {
       setElapsed(0);
       setMuted(false);
+      console.warn("Voice disconnected:", details);
+      if (!disconnectToastShownRef.current) {
+        disconnectToastShownRef.current = true;
+        window.setTimeout(() => {
+          disconnectToastShownRef.current = false;
+        }, 1500);
+      }
     },
     onError: (err: unknown) => {
-      // ElevenLabs occasionally emits a malformed error event right after the
-      // first agent reply (missing the inner `error` payload). Logging it is
-      // enough — surfacing a toast + tearing the call down made it look like
-      // the call was instantly ending. The SDK will disconnect on its own if
-      // it's truly fatal.
       console.warn("Voice error event:", err);
     },
-    onMessage: (msg: { source: "user" | "ai"; message: string }) => {
+    onMessage: (msg) => {
       if (!msg?.message) return;
       setTranscripts((p) => [
         ...p,
-        { id: crypto.randomUUID(), role: msg.source === "user" ? "user" : "agent", text: msg.message },
+        {
+          id: crypto.randomUUID(),
+          role: msg.role === "user" ? "user" : "agent",
+          text: msg.message,
+        },
       ]);
     },
+  });
+
+  useConversationClientTool("navigate_to", async (params: { destination?: string }) => {
+    const key = (params?.destination ?? "").toLowerCase().trim();
+    const match = NAV_DESTINATIONS[key];
+    if (!match) {
+      return `Unknown destination "${params?.destination}". Available: ${Object.keys(NAV_DESTINATIONS).join(", ")}`;
+    }
+
+    navigate(match.path);
+    toast.success(`Opening ${match.label}`);
+
+    const snapshot = await captureVisibleScreenAfterDelay(900, 5000);
+    return [
+      `Navigated to ${match.label}.`,
+      `Path: ${snapshot.path}`,
+      snapshot.title ? `Title: ${snapshot.title}` : null,
+      `Visible content: ${snapshot.content || "No readable content found on the page."}`,
+      "Answer the user using this visible page content.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  });
+
+  useConversationClientTool("get_current_screen", async () => {
+    try {
+      return JSON.stringify(await captureVisibleScreenAfterDelay(700, 5000));
+    } catch {
+      return JSON.stringify({ error: "Could not read screen" });
+    }
   });
 
   const status = conversation.status;
@@ -124,6 +131,7 @@ function ReceptionistWidgetInner() {
       }
 
       setTranscripts([]);
+      disconnectToastShownRef.current = false;
       const hasOverrides =
         data.overrides &&
         typeof data.overrides === "object" &&
