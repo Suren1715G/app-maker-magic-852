@@ -57,18 +57,27 @@ export type Database = {
       }
       companies: {
         Row: {
+          ai_first_message: string | null
+          ai_system_prompt: string | null
+          ai_voice_id: string | null
           created_at: string
           id: string
           name: string
           updated_at: string
         }
         Insert: {
+          ai_first_message?: string | null
+          ai_system_prompt?: string | null
+          ai_voice_id?: string | null
           created_at?: string
           id?: string
           name: string
           updated_at?: string
         }
         Update: {
+          ai_first_message?: string | null
+          ai_system_prompt?: string | null
+          ai_voice_id?: string | null
           created_at?: string
           id?: string
           name?: string

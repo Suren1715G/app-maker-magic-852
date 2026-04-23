@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Zap, Monitor, Smartphone } from "lucide-react";
 import { sessions } from "@/data/mock";
@@ -9,6 +9,18 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+
+const VOICE_OPTIONS: { id: string; label: string }[] = [
+  { id: "9BWtsMINqrJLrRacOk9x", label: "Aria · Friendly female" },
+  { id: "EXAVITQu4vr4xnSDxMaL", label: "Sarah · Warm female" },
+  { id: "FGY2WhTYpPnrIDTdsKH5", label: "Laura · Upbeat female" },
+  { id: "JBFqnCBsd6RMkjVDRZzb", label: "George · Calm male" },
+  { id: "TX3LPaxmHKxFdv7VOQHJ", label: "Liam · Confident male" },
+  { id: "nPczCjzI2devNBz1zQrb", label: "Brian · Deep male" },
+  { id: "cgSgspJ2msm6clMCkdW9", label: "Jessica · Energetic female" },
+  { id: "iP95p4xoKVk53GoZ742B", label: "Chris · Casual male" },
+];
 
 const Settings = () => {
   const { user, signOut } = useAuth();
@@ -18,8 +30,13 @@ const Settings = () => {
   const [alwaysOn, setAlwaysOn] = useState(true);
   const [openTime, setOpenTime] = useState("08:00");
   const [closeTime, setCloseTime] = useState("18:00");
-  const [voice, setVoice] = useState("Aria · Friendly");
   const [greeting, setGreeting] = useState("Hi! You've reached SGS. How can I help today?");
+  const [aiPrompt, setAiPrompt] = useState(
+    "You are a friendly AI receptionist. Greet callers warmly, answer questions about our services, qualify leads, and offer to book an appointment. Keep replies under two sentences.",
+  );
+  const [aiVoiceId, setAiVoiceId] = useState<string>(VOICE_OPTIONS[0].id);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [savingAi, setSavingAi] = useState(false);
   const [services, setServices] = useState(["Deep Clean", "Move-out Clean", "Office Clean", "Standard Clean"]);
   const [newSvc, setNewSvc] = useState("");
   const [darkMode, setDarkMode] = useState(true);
@@ -77,6 +94,50 @@ const Settings = () => {
     navigate("/auth", { replace: true });
   };
 
+  // Load company AI settings
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("company_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!profile?.company_id) return;
+      setCompanyId(profile.company_id);
+      const { data: company } = await supabase
+        .from("companies")
+        .select("ai_system_prompt, ai_first_message, ai_voice_id")
+        .eq("id", profile.company_id)
+        .maybeSingle();
+      if (company?.ai_system_prompt) setAiPrompt(company.ai_system_prompt);
+      if (company?.ai_first_message) setGreeting(company.ai_first_message);
+      if (company?.ai_voice_id) setAiVoiceId(company.ai_voice_id);
+    })();
+  }, [user]);
+
+  const saveAi = async () => {
+    if (!companyId) {
+      toast.error("No company linked to your account");
+      return;
+    }
+    setSavingAi(true);
+    const { error } = await supabase
+      .from("companies")
+      .update({
+        ai_system_prompt: aiPrompt,
+        ai_first_message: greeting,
+        ai_voice_id: aiVoiceId,
+      })
+      .eq("id", companyId);
+    setSavingAi(false);
+    if (error) {
+      toast.error("Failed to save AI settings");
+    } else {
+      toast.success("AI receptionist updated");
+    }
+  };
+
   return (
     <AppShell>
       <PageHeader title="Settings" subtitle="Manage your AI receptionist." />
@@ -123,16 +184,46 @@ const Settings = () => {
         )}
       </Section>
 
-      <Section title="AI">
-        <Field label="Voice" value={voice} onChange={setVoice} />
+      <Section title="AI receptionist">
+        <div className="px-4 py-3">
+          <div className="text-xs text-muted-foreground mb-1.5">Voice</div>
+          <select
+            value={aiVoiceId}
+            onChange={(e) => setAiVoiceId(e.target.value)}
+            className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {VOICE_OPTIONS.map((v) => (
+              <option key={v.id} value={v.id}>{v.label}</option>
+            ))}
+          </select>
+        </div>
         <div className="px-4 py-3.5">
-          <div className="text-xs text-muted-foreground mb-1.5">Custom greeting</div>
+          <div className="text-xs text-muted-foreground mb-1.5">Greeting</div>
           <textarea
             value={greeting}
             onChange={(e) => setGreeting(e.target.value)}
             rows={2}
+            placeholder="Hi! Thanks for calling. How can I help today?"
             className="w-full rounded-xl bg-input border border-border p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
+          <div className="text-[10px] text-muted-foreground mt-1">
+            Tip: use <code>{"{business}"}</code> to insert your business name.
+          </div>
+        </div>
+        <div className="px-4 py-3.5">
+          <div className="text-xs text-muted-foreground mb-1.5">Personality &amp; instructions</div>
+          <textarea
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            rows={5}
+            placeholder="Describe how the AI should behave, what services you offer, your hours, pricing, booking rules…"
+            className="w-full rounded-xl bg-input border border-border p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+        <div className="px-4 py-3 flex justify-end">
+          <Button size="sm" onClick={saveAi} disabled={savingAi || !companyId}>
+            {savingAi ? "Saving…" : "Save AI settings"}
+          </Button>
         </div>
       </Section>
 
