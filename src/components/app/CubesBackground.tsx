@@ -2,6 +2,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useLocation } from "react-router-dom";
+import { Environment } from "@react-three/drei";
 
 type CubeData = {
   position: [number, number, number];
@@ -40,12 +41,14 @@ function FloatingCube({ data }: { data: CubeData }) {
   return (
     <mesh ref={ref} position={data.position} scale={data.scale}>
       <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial
+      <meshPhysicalMaterial
         color={data.color}
-        roughness={0.35}
-        metalness={0.55}
-        emissive={data.color}
-        emissiveIntensity={0.18}
+        metalness={1}
+        roughness={0.08}
+        clearcoat={1}
+        clearcoatRoughness={0.05}
+        reflectivity={1}
+        envMapIntensity={1.6}
       />
     </mesh>
   );
