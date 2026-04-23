@@ -1,5 +1,5 @@
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
 import { useLocation } from "react-router-dom";
 import { Environment } from "@react-three/drei";
@@ -116,14 +116,14 @@ function OrbitalRing({
     <mesh ref={ref} rotation={tilt}>
       <torusGeometry args={[radius, thickness, 16, 128]} />
       <meshPhysicalMaterial
-        color={color}
+        color="#f5f5f5"
         metalness={1}
-        roughness={0.05}
+        roughness={0.02}
         clearcoat={1}
-        clearcoatRoughness={0.02}
+        clearcoatRoughness={0.01}
+        envMapIntensity={3}
         emissive={color}
-        emissiveIntensity={0.6}
-        envMapIntensity={2}
+        emissiveIntensity={0.18}
         toneMapped={false}
       />
     </mesh>
