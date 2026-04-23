@@ -54,23 +54,23 @@ function ReceptionistWidgetInner() {
         }
         navigate(match.path);
         toast.success(`Opening ${match.label}`);
-        setOpen(false);
-        return `Navigated to ${match.label}`;
+        // Keep the widget open so the call stays visible and active.
+        return `Navigated to ${match.label}. The new page is now loading.`;
       },
       // Agent calls this to read whatever page the user is currently on.
       // Returns the route + visible text content so the AI can answer
       // questions like "how many calls today?" based on what's on screen.
-      get_current_screen: () => {
+      get_current_screen: async () => {
+        // Wait a beat so any in-flight navigation/render finishes before we read.
+        await new Promise((r) => setTimeout(r, 600));
         try {
           const path = window.location.pathname;
           const title = document.title;
           const main = document.querySelector("main") ?? document.body;
-          // Grab visible text, collapse whitespace, cap length so we don't
-          // blow past the agent's context window.
           const raw = (main as HTMLElement).innerText ?? "";
           const text = raw.replace(/\s+/g, " ").trim().slice(0, 4000);
           return JSON.stringify({ path, title, content: text });
-        } catch (e) {
+        } catch {
           return JSON.stringify({ error: "Could not read screen" });
         }
       },
