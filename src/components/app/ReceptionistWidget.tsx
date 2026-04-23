@@ -60,6 +60,7 @@ function ReceptionistWidgetInner() {
       await conversation.startSession({
         conversationToken: data.token,
         connectionType: "webrtc",
+        overrides: data.overrides ?? undefined,
       });
     } catch (e) {
       console.error(e);
