@@ -34,6 +34,21 @@ const addDays = (d: Date, n: number) => {
   return x;
 };
 const startOfWeek = (d: Date) => addDays(startOfDay(d), -d.getDay());
+const fmtFullDate = (d: Date) =>
+  d.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+const fmtBookingLabel = (b: Booking) =>
+  `${b.customer}, ${b.service}, ${new Date(b.startsAt).toLocaleString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
 
 const Calendar = () => {
   const today = new Date();
@@ -235,10 +250,23 @@ const MonthView = ({
           const isToday = sameDay(d, today);
           const isSelected = sameDay(d, selected);
           const evs = eventsFor(d);
+          const ariaLabel = [
+            isToday ? "Today." : null,
+            isSelected ? "Selected day." : null,
+            fmtFullDate(d),
+            evs.length
+              ? `${evs.length} booking${evs.length > 1 ? "s" : ""}: ${evs
+                  .map((e) => fmtBookingLabel(e))
+                  .join("; ")}.`
+              : "No bookings.",
+          ]
+            .filter(Boolean)
+            .join(" ");
           return (
             <button
               key={i}
               onClick={() => onSelectDay(d)}
+              aria-label={ariaLabel}
               className={cn(
                 "min-h-[88px] sm:min-h-[104px] border-b border-r border-border p-1.5 text-left flex flex-col gap-1 transition-colors",
                 "hover:bg-accent/40 focus:outline-none focus:bg-accent/40",
@@ -308,6 +336,17 @@ const WeekView = ({
             <button
               key={d.toISOString()}
               onClick={() => onSelectDay(d)}
+              aria-label={[
+                isToday ? "Today." : null,
+                fmtFullDate(d),
+                evs.length
+                  ? `${evs.length} booking${evs.length > 1 ? "s" : ""}: ${evs
+                      .map((e) => fmtBookingLabel(e))
+                      .join("; ")}.`
+                  : "No bookings.",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               className="text-left p-3 min-h-[260px] hover:bg-accent/40 transition-colors flex flex-col gap-2"
             >
               <div className="flex flex-col items-start">
@@ -366,6 +405,7 @@ const DayView = ({ day, events }: { day: Date; events: Booking[] }) => {
                 .map((e) => (
                   <div
                     key={e.id}
+                    aria-label={fmtBookingLabel(e)}
                     className={cn(
                       "rounded-xl px-3 py-2 mb-1",
                       e.smsConfirmed ? "bg-primary/15 text-primary" : "bg-muted text-foreground"
@@ -411,7 +451,7 @@ const DayDetail = ({
     {events.length > 0 && (
       <ul className="space-y-2">
         {events.map((b) => (
-          <li key={b.id} className="glass rounded-2xl p-4 flex gap-4">
+          <li key={b.id} aria-label={fmtBookingLabel(b)} className="glass rounded-2xl p-4 flex gap-4">
             <div className="flex flex-col items-center justify-center min-w-[72px] bg-primary/10 rounded-xl py-2">
               <div className="font-display text-lg font-semibold leading-none">{fmtTime(b.startsAt)}</div>
               <div className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
