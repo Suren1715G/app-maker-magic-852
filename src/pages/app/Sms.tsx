@@ -97,10 +97,29 @@ const Sms = () => {
       {(() => {
         const totalThreads = threads.length;
         const totalUnread = threads.reduce((a, t) => a + t.unread, 0);
+        const totalMessages = threads.reduce((a, t) => a + t.messages.length, 0);
+        const inboundMessages = threads.reduce(
+          (a, t) => a + t.messages.filter((m) => m.from !== "ai").length,
+          0,
+        );
+        const outboundMessages = totalMessages - inboundMessages;
         const flagged = threads.filter((t) => t.flagged).length;
         const summary =
-          `Messages overview — ${totalThreads} thread${totalThreads === 1 ? "" : "s"}, ` +
-          `${totalUnread} unread message${totalUnread === 1 ? "" : "s"}, ${flagged} flagged.`;
+          `Messages page overview (source of truth). ` +
+          `Total conversation threads: ${totalThreads}. ` +
+          `Total messages across all threads: ${totalMessages} ` +
+          `(${inboundMessages} received from customers, ${outboundMessages} sent by the AI assistant). ` +
+          `Currently unread messages: ${totalUnread}. ` +
+          `Flagged threads: ${flagged}. ` +
+          `Thread breakdown: ` +
+          threads
+            .map(
+              (t) =>
+                `${t.customer} has ${t.messages.length} message${t.messages.length === 1 ? "" : "s"} ` +
+                `(${t.unread} unread${t.flagged ? ", flagged" : ""})`,
+            )
+            .join("; ") +
+          ".";
         return <p className="sr-only" aria-label={summary}>{summary}</p>;
       })()}
       <ul className="space-y-2">
