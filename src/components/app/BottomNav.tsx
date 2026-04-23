@@ -33,7 +33,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 glass-strong safe-bottom border-t border-border/60">
-      <ul className="grid grid-cols-5 max-w-md mx-auto">
+      <ul className="grid grid-cols-5 max-w-md md:max-w-3xl lg:max-w-5xl mx-auto">
         {primary.map(({ to, label, icon: Icon }) => (
           <li key={to}>
             <NavLink
