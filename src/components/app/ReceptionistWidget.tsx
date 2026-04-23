@@ -13,6 +13,22 @@ import { captureVisibleScreenAfterDelay } from "@/lib/screenContext";
 
 type Transcript = { id: string; role: "user" | "agent"; text: string };
 
+function isQuotaMessage(message?: string | null) {
+  return /quota|credits? remaining|payment required|insufficient credits/i.test(message ?? "");
+}
+
+function getFriendlyVoiceError(message?: string | null) {
+  if (!message) return "Call ended unexpectedly";
+  if (isQuotaMessage(message)) {
+    return "Voice is unavailable because the ElevenLabs account has no remaining quota.";
+  }
+  return message;
+}
+
+function getDisconnectMessage(details?: DisconnectionDetails) {
+  return details?.message || details?.closeReason || null;
+}
+
 // Friendly destinations the AI can navigate to. Keys are matched case-insensitively.
 const NAV_DESTINATIONS: Record<string, { path: string; label: string }> = {
   home: { path: "/", label: "Home" },
@@ -43,20 +59,38 @@ export function ReceptionistWidget() {
   const [connecting, setConnecting] = useState(false);
   const [muted, setMuted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [callError, setCallError] = useState<string | null>(null);
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const transcriptScrollRef = useRef<HTMLDivElement | null>(null);
 
   const conversation = useConversation({
-    onConnect: () => toast.success("Connected to your AI receptionist"),
+    onConnect: () => {
+      setCallError(null);
+      toast.success("Connected to your AI receptionist");
+    },
     onDisconnect: (details?: DisconnectionDetails) => {
       setElapsed(0);
       setMuted(false);
+      const friendlyMessage = getFriendlyVoiceError(getDisconnectMessage(details));
+
       if (details?.reason === "error") {
         console.warn("Voice disconnected with error:", details);
+        setCallError(friendlyMessage);
+        if (isQuotaMessage(friendlyMessage)) {
+          setQuotaExceeded(true);
+        }
+        toast.error(friendlyMessage);
       }
     },
     onError: (message: string) => {
       console.warn("Voice error:", message);
+      const friendlyMessage = getFriendlyVoiceError(message);
+      setCallError(friendlyMessage);
+      if (isQuotaMessage(friendlyMessage)) {
+        setQuotaExceeded(true);
+      }
+      toast.error(friendlyMessage);
     },
     onMessage: ({ message, source }) => {
       if (!message) return;
@@ -125,15 +159,26 @@ export function ReceptionistWidget() {
   }, [transcripts]);
 
   const startCall = useCallback(async () => {
+    if (quotaExceeded) {
+      toast.error("Voice is unavailable until the ElevenLabs quota is restored.");
+      return;
+    }
+
     setConnecting(true);
     try {
       // Mic permission MUST be requested directly inside the click handler.
       await navigator.mediaDevices.getUserMedia({ audio: true });
+      setCallError(null);
 
       const { data, error } = await supabase.functions.invoke("voice-token");
       if (error || !data?.signedUrl) {
         console.error("Token error:", error, data);
-        toast.error("Could not start call");
+        const friendlyMessage = getFriendlyVoiceError(error?.message ?? "Could not start call");
+        setCallError(friendlyMessage);
+        if (isQuotaMessage(friendlyMessage)) {
+          setQuotaExceeded(true);
+        }
+        toast.error(friendlyMessage);
         return;
       }
 
@@ -212,6 +257,8 @@ export function ReceptionistWidget() {
                       ? isSpeaking
                         ? "Speaking…"
                         : "Listening…"
+                        : quotaExceeded
+                          ? "Voice unavailable"
                       : connecting
                         ? "Connecting…"
                         : "Tap call to start"}
@@ -252,6 +299,10 @@ export function ReceptionistWidget() {
                     <div className="text-xs font-mono text-muted-foreground">
                       {formatTime(elapsed)}
                     </div>
+                  ) : callError ? (
+                    <div className="text-xs text-destructive max-w-[240px]">
+                      {callError}
+                    </div>
                   ) : (
                     <div className="text-xs text-muted-foreground max-w-[240px]">
                       Hands-free call. Just speak — your AI receptionist will answer back.
@@ -290,10 +341,14 @@ export function ReceptionistWidget() {
                 {!isConnected ? (
                   <button
                     onClick={startCall}
-                    disabled={connecting}
+                    disabled={connecting || quotaExceeded}
                     className="h-14 px-6 rounded-full bg-success text-success-foreground font-semibold text-sm flex items-center gap-2 shadow-lg hover:scale-105 transition-transform disabled:opacity-60"
                   >
-                    {connecting ? (
+                    {quotaExceeded ? (
+                      <>
+                        <PhoneOff className="h-4 w-4" /> Voice unavailable
+                      </>
+                    ) : connecting ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" /> Connecting…
                       </>
