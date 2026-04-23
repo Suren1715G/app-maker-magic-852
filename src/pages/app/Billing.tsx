@@ -1,11 +1,14 @@
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { invoices } from "@/data/mock";
+import { invoices as mockInvoices } from "@/data/mock";
 import { fmtMoney } from "@/lib/format";
 import { Check, Download, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 
 const Billing = () => {
+  const isNew = useIsNewCustomer();
+  const invoices = isNew ? [] : mockInvoices;
   return (
     <AppShell>
       <PageHeader title="Billing" subtitle="Simple, all-inclusive pricing." />
@@ -46,6 +49,11 @@ const Billing = () => {
       </div>
 
       <h2 className="font-display text-lg font-semibold mb-3">Invoice history</h2>
+      {invoices.length === 0 ? (
+        <div className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground mb-12">
+          No invoices yet.
+        </div>
+      ) : (
       <ul className="glass rounded-2xl divide-y divide-border/60 overflow-hidden mb-12">
         {invoices.map((inv) => (
           <li key={inv.id} className="flex items-center justify-between px-4 py-3.5">
@@ -68,6 +76,7 @@ const Billing = () => {
           </li>
         ))}
       </ul>
+      )}
     </AppShell>
   );
 };
