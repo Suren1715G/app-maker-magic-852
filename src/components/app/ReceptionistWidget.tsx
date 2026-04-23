@@ -6,7 +6,6 @@ import {
   useConversationClientTool,
   type DisconnectionDetails,
 } from "@elevenlabs/react";
-import type { MessagePayload } from "@elevenlabs/client";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -65,7 +64,7 @@ function ReceptionistWidgetInner() {
     onError: (err: unknown) => {
       console.warn("Voice error event:", err);
     },
-    onMessage: (msg: MessagePayload) => {
+    onMessage: (msg) => {
       if (!msg?.message) return;
       setTranscripts((p) => [
         ...p,
