@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { ExternalLink, LogOut, Plus, Trash2, Upload } from "lucide-react";
+import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -13,13 +13,39 @@ const Settings = () => {
   const navigate = useNavigate();
 
   const [phone, setPhone] = useState("+1 (844) 790-5754");
-  const [hours, setHours] = useState("24/7 — always on");
+  const [alwaysOn, setAlwaysOn] = useState(true);
+  const [openTime, setOpenTime] = useState("08:00");
+  const [closeTime, setCloseTime] = useState("18:00");
   const [voice, setVoice] = useState("Aria · Friendly");
   const [greeting, setGreeting] = useState("Hi! You've reached SGS. How can I help today?");
   const [services, setServices] = useState(["Deep Clean", "Move-out Clean", "Office Clean", "Standard Clean"]);
   const [newSvc, setNewSvc] = useState("");
   const [darkMode, setDarkMode] = useState(true);
   const [logo, setLogo] = useState<string | null>(null);
+
+  // Notifications
+  const [notifPush, setNotifPush] = useState(true);
+  const [notifNewLead, setNotifNewLead] = useState(true);
+  const [notifBooking, setNotifBooking] = useState(true);
+  const [notifMissed, setNotifMissed] = useState(true);
+  const [notifDaily, setNotifDaily] = useState(true);
+  const [notifWeekly, setNotifWeekly] = useState(false);
+
+  // Security
+  const [twoFA, setTwoFA] = useState(false);
+
+  // Team
+  const [team, setTeam] = useState<{ email: string; role: string }[]>([
+    { email: "owner@sgs.com", role: "Owner" },
+  ]);
+  const [teamEmail, setTeamEmail] = useState("");
+
+  const inviteTeammate = () => {
+    if (!teamEmail.trim()) return;
+    setTeam((p) => [...p, { email: teamEmail.trim(), role: "Receptionist" }]);
+    setTeamEmail("");
+    toast.success("Invite sent (demo)");
+  };
 
   const onLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -68,7 +94,24 @@ const Settings = () => {
 
       <Section title="Business">
         <Field label="Phone number" value={phone} onChange={setPhone} />
-        <Field label="Business hours" value={hours} onChange={setHours} />
+        <Toggle
+          label="Always on (24/7)"
+          hint="AI answers around the clock"
+          checked={alwaysOn}
+          onChange={setAlwaysOn}
+        />
+        {!alwaysOn && (
+          <div className="px-4 py-3 grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Opens</div>
+              <Input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="h-9 bg-input" />
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Closes</div>
+              <Input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="h-9 bg-input" />
+            </div>
+          </div>
+        )}
       </Section>
 
       <Section title="AI">
@@ -109,6 +152,74 @@ const Settings = () => {
 
       <Section title="Appearance">
         <Toggle label="Dark mode" hint="Easy on the eyes" checked={darkMode} onChange={setDarkMode} />
+      </Section>
+
+      <Section title="Notifications">
+        <Toggle label="Push notifications" hint="On this device" checked={notifPush} onChange={setNotifPush} />
+        <Toggle label="New lead" hint="Instant alert when a caller becomes a lead" checked={notifNewLead} onChange={setNotifNewLead} />
+        <Toggle label="Appointment booked" hint="When AI books a slot" checked={notifBooking} onChange={setNotifBooking} />
+        <Toggle label="Missed call" hint="Caller hung up — auto SMS sent" checked={notifMissed} onChange={setNotifMissed} />
+        <Toggle label="Daily 9am summary" hint="Yesterday's recap by email" checked={notifDaily} onChange={setNotifDaily} />
+        <Toggle label="Weekly performance report" hint="Mondays by email" checked={notifWeekly} onChange={setNotifWeekly} />
+      </Section>
+
+      <Section title="Security">
+        <Toggle
+          label="Two-factor authentication"
+          hint="Require a code from your phone at sign-in"
+          checked={twoFA}
+          onChange={(v) => { setTwoFA(v); toast.success(v ? "2FA enabled (demo)" : "2FA disabled"); }}
+        />
+        <div className="px-4 py-3.5 flex items-center gap-3">
+          <span className="h-9 w-9 rounded-full bg-success/15 text-success flex items-center justify-center">
+            <ShieldCheck className="h-4 w-4" />
+          </span>
+          <div className="flex-1 text-xs text-muted-foreground">
+            All data encrypted end-to-end. View session activity in your account.
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Team access">
+        <ul className="px-4 py-2 divide-y divide-border/60">
+          {team.map((t, i) => (
+            <li key={t.email} className="flex items-center justify-between py-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
+                  {t.email[0].toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-sm truncate">{t.email}</div>
+                  <div className="text-[10px] text-muted-foreground">{t.role}</div>
+                </div>
+              </div>
+              {t.role !== "Owner" && (
+                <button
+                  onClick={() => setTeam((p) => p.filter((_, j) => j !== i))}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        <div className="px-4 pb-3 flex gap-2">
+          <div className="relative flex-1">
+            <Mail className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="email"
+              value={teamEmail}
+              onChange={(e) => setTeamEmail(e.target.value)}
+              placeholder="teammate@email.com"
+              className="h-9 pl-8"
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), inviteTeammate())}
+            />
+          </div>
+          <Button size="sm" onClick={inviteTeammate}>
+            <UserPlus className="h-3.5 w-3.5" /> Invite
+          </Button>
+        </div>
       </Section>
 
       <div className="flex justify-end mb-6">
