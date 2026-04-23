@@ -185,16 +185,46 @@ const Settings = () => {
         )}
       </Section>
 
-      <Section title="AI">
-        <Field label="Voice" value={voice} onChange={setVoice} />
+      <Section title="AI receptionist">
+        <div className="px-4 py-3">
+          <div className="text-xs text-muted-foreground mb-1.5">Voice</div>
+          <select
+            value={aiVoiceId}
+            onChange={(e) => setAiVoiceId(e.target.value)}
+            className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {VOICE_OPTIONS.map((v) => (
+              <option key={v.id} value={v.id}>{v.label}</option>
+            ))}
+          </select>
+        </div>
         <div className="px-4 py-3.5">
-          <div className="text-xs text-muted-foreground mb-1.5">Custom greeting</div>
+          <div className="text-xs text-muted-foreground mb-1.5">Greeting</div>
           <textarea
             value={greeting}
             onChange={(e) => setGreeting(e.target.value)}
             rows={2}
+            placeholder="Hi! Thanks for calling. How can I help today?"
             className="w-full rounded-xl bg-input border border-border p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
+          <div className="text-[10px] text-muted-foreground mt-1">
+            Tip: use <code>{"{business}"}</code> to insert your business name.
+          </div>
+        </div>
+        <div className="px-4 py-3.5">
+          <div className="text-xs text-muted-foreground mb-1.5">Personality &amp; instructions</div>
+          <textarea
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            rows={5}
+            placeholder="Describe how the AI should behave, what services you offer, your hours, pricing, booking rules…"
+            className="w-full rounded-xl bg-input border border-border p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+        <div className="px-4 py-3 flex justify-end">
+          <Button size="sm" onClick={saveAi} disabled={savingAi || !companyId}>
+            {savingAi ? "Saving…" : "Save AI settings"}
+          </Button>
         </div>
       </Section>
 
