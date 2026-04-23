@@ -26,7 +26,14 @@ function getFriendlyVoiceError(message?: string | null) {
 }
 
 function getDisconnectMessage(details?: DisconnectionDetails) {
-  return details?.message || details?.closeReason || null;
+  if (!details) return null;
+  if ("message" in details && typeof details.message === "string") {
+    return details.message;
+  }
+  if ("closeReason" in details && typeof details.closeReason === "string") {
+    return details.closeReason;
+  }
+  return null;
 }
 
 // Friendly destinations the AI can navigate to. Keys are matched case-insensitively.
