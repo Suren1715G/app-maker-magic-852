@@ -1,9 +1,11 @@
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDemoMode } from "@/contexts/DemoModeContext";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading, companyId, isAdmin, roleLoading } = useAuth();
+  const { demoMode } = useDemoMode();
   const location = useLocation();
 
   if (loading || roleLoading) {
@@ -18,8 +20,13 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     return <Navigate to="/auth" replace state={{ from: location }} />;
   }
 
+  // Admins normally live in /master. Send them there unless they've explicitly
+  // entered "customer demo view" from the master sidebar.
+  if (isAdmin && !demoMode) {
+    return <Navigate to="/master" replace />;
+  }
+
   // Users with no company link (e.g. fresh Google sign-in) must enter their code first.
-  // Admins are exempt — they manage codes, not consume them.
   if (!companyId && !isAdmin && location.pathname !== "/claim") {
     return <Navigate to="/claim" replace />;
   }
