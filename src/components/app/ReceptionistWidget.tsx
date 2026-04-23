@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Mic, MicOff, PhoneOff, Phone, Sparkles, X, Loader2 } from "lucide-react";
 import {
   useConversation,
@@ -80,7 +80,6 @@ export function ReceptionistWidget() {
   const [callError, setCallError] = useState<string | null>(null);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
-  const transcriptScrollRef = useRef<HTMLDivElement | null>(null);
 
   const conversation = useConversation({
     onConnect: () => {
@@ -182,12 +181,6 @@ export function ReceptionistWidget() {
     const t = window.setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => window.clearInterval(t);
   }, [isConnected]);
-
-  // Auto-scroll transcript
-  useEffect(() => {
-    const el = transcriptScrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [transcripts]);
 
   const startCall = useCallback(async () => {
     if (quotaExceeded) {
