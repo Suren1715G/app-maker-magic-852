@@ -115,10 +115,15 @@ function OrbitalRing({
   return (
     <mesh ref={ref} rotation={tilt}>
       <torusGeometry args={[radius, thickness, 16, 128]} />
-      <meshStandardMaterial
+      <meshPhysicalMaterial
         color={color}
+        metalness={1}
+        roughness={0.05}
+        clearcoat={1}
+        clearcoatRoughness={0.02}
         emissive={color}
-        emissiveIntensity={1.4}
+        emissiveIntensity={0.6}
+        envMapIntensity={2}
         toneMapped={false}
       />
     </mesh>
@@ -147,7 +152,14 @@ function MiniCube({
   return (
     <mesh ref={ref} position={position} scale={scale}>
       <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} />
+      <meshPhysicalMaterial
+        color={color}
+        metalness={1}
+        roughness={0.08}
+        clearcoat={1}
+        clearcoatRoughness={0.05}
+        envMapIntensity={1.8}
+      />
     </mesh>
   );
 }
@@ -262,12 +274,15 @@ function PrismShape() {
   return (
     <mesh ref={ref}>
       <icosahedronGeometry args={[3, 0]} />
-      <meshStandardMaterial
-        color="#a855f7"
+      <meshPhysicalMaterial
+        color="#e0e0e0"
+        metalness={1}
+        roughness={0.04}
+        clearcoat={1}
+        clearcoatRoughness={0.02}
+        envMapIntensity={2.2}
         emissive="#c026d3"
-        emissiveIntensity={0.4}
-        metalness={0.9}
-        roughness={0.15}
+        emissiveIntensity={0.25}
         wireframe
       />
     </mesh>
@@ -319,6 +334,7 @@ export function CubesBackground() {
         dpr={[1, 1.5]}
         gl={{ antialias: true, alpha: true }}
       >
+        <Environment preset="night" background={false} />
         {variant === "cubes" && <CubesScene />}
         {variant === "orbits" && <OrbitsScene />}
         {variant === "particles" && <ParticlesScene />}
