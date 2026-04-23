@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Zap, Monitor, Smartphone } from "lucide-react";
 import { sessions } from "@/data/mock";
@@ -9,6 +9,18 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+
+const VOICE_OPTIONS: { id: string; label: string }[] = [
+  { id: "9BWtsMINqrJLrRacOk9x", label: "Aria · Friendly female" },
+  { id: "EXAVITQu4vr4xnSDxMaL", label: "Sarah · Warm female" },
+  { id: "FGY2WhTYpPnrIDTdsKH5", label: "Laura · Upbeat female" },
+  { id: "JBFqnCBsd6RMkjVDRZzb", label: "George · Calm male" },
+  { id: "TX3LPaxmHKxFdv7VOQHJ", label: "Liam · Confident male" },
+  { id: "nPczCjzI2devNBz1zQrb", label: "Brian · Deep male" },
+  { id: "cgSgspJ2msm6clMCkdW9", label: "Jessica · Energetic female" },
+  { id: "iP95p4xoKVk53GoZ742B", label: "Chris · Casual male" },
+];
 
 const Settings = () => {
   const { user, signOut } = useAuth();
