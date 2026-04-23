@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail } from "lucide-react";
+import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Zap, Monitor, Smartphone } from "lucide-react";
+import { sessions } from "@/data/mock";
+import { fmtRel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -39,6 +41,13 @@ const Settings = () => {
     { email: "owner@sgs.com", role: "Owner" },
   ]);
   const [teamEmail, setTeamEmail] = useState("");
+
+  // White label
+  const [whiteLabel, setWhiteLabel] = useState(false);
+  const [brandName, setBrandName] = useState("SGS AI");
+
+  // Zapier
+  const [zapHook, setZapHook] = useState("");
 
   const inviteTeammate = () => {
     if (!teamEmail.trim()) return;
@@ -220,6 +229,83 @@ const Settings = () => {
             <UserPlus className="h-3.5 w-3.5" /> Invite
           </Button>
         </div>
+      </Section>
+
+      <Section title="White label (Enterprise)">
+        <Toggle
+          label="Use my own branding"
+          hint="Replace SGS branding with your own across the app"
+          checked={whiteLabel}
+          onChange={(v) => { setWhiteLabel(v); toast.success(v ? "White-label enabled (demo)" : "Reverted to default branding"); }}
+        />
+        {whiteLabel && (
+          <div className="px-4 py-3">
+            <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+              <Palette className="h-3 w-3" /> Brand name
+            </div>
+            <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} className="h-9 bg-input" />
+          </div>
+        )}
+      </Section>
+
+      <Section title="Integrations">
+        <div className="px-4 py-3.5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="h-8 w-8 rounded-full bg-accent/15 text-accent flex items-center justify-center">
+              <Zap className="h-4 w-4" />
+            </span>
+            <div className="flex-1">
+              <div className="text-sm font-medium">Zapier</div>
+              <div className="text-[11px] text-muted-foreground">Send leads to HubSpot, Salesforce, Sheets, and 5,000+ apps</div>
+            </div>
+          </div>
+          <Input
+            value={zapHook}
+            onChange={(e) => setZapHook(e.target.value)}
+            placeholder="https://hooks.zapier.com/..."
+            className="h-9 bg-input"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-2 w-full"
+            disabled={!zapHook.trim()}
+            onClick={() => toast.success("Test event sent (demo)")}
+          >
+            Send test event
+          </Button>
+        </div>
+      </Section>
+
+      <Section title="Active sessions">
+        <ul className="px-4 py-2 divide-y divide-border/60">
+          {sessions.map((s) => (
+            <li key={s.id} className="flex items-center gap-3 py-2.5">
+              <span className="h-9 w-9 rounded-full bg-card border border-border flex items-center justify-center shrink-0">
+                {s.device.includes("iPhone") ? (
+                  <Smartphone className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Monitor className="h-4 w-4 text-muted-foreground" />
+                )}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium flex items-center gap-1.5">
+                  {s.device}
+                  {s.current && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/15 text-success">This device</span>}
+                </div>
+                <div className="text-[11px] text-muted-foreground truncate">{s.location} · {s.ip} · {fmtRel(s.at)}</div>
+              </div>
+              {!s.current && (
+                <button
+                  onClick={() => toast.success("Session revoked (demo)")}
+                  className="text-[11px] text-destructive hover:underline"
+                >
+                  Revoke
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
       </Section>
 
       <div className="flex justify-end mb-6">

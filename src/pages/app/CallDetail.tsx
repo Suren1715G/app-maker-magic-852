@@ -1,13 +1,25 @@
 import { AppShell } from "@/components/app/AppShell";
-import { calls } from "@/data/mock";
+import { calls, type CallTag } from "@/data/mock";
 import { fmtDuration, fmtTime } from "@/lib/format";
-import { ArrowLeft, Bot, CalendarPlus, Phone, User } from "lucide-react";
+import { ArrowLeft, Bot, CalendarPlus, Phone, User, Tag } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+
+const allTags: CallTag[] = ["lead", "booked", "follow-up", "spam"];
+const tagTone: Record<CallTag, string> = {
+  lead: "bg-primary/20 text-primary border-primary/40",
+  booked: "bg-success/20 text-success border-success/40",
+  "follow-up": "bg-accent/20 text-accent border-accent/40",
+  spam: "bg-muted text-muted-foreground border-border",
+};
 
 const CallDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const call = calls.find((c) => c.id === id);
+  const [tag, setTag] = useState<CallTag | undefined>(call?.tag);
 
   if (!call) {
     return (
@@ -34,9 +46,38 @@ const CallDetail = () => {
         <p className="text-sm text-muted-foreground">{call.phone} · {fmtTime(call.startedAt)} · {fmtDuration(call.durationSec)}</p>
       </header>
 
+      {call.recordingUrl && (
+        <div className="glass rounded-2xl p-4 mb-4">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Recording</div>
+          <audio controls className="w-full">
+            <source src={call.recordingUrl} type="audio/mpeg" />
+          </audio>
+        </div>
+      )}
+
       <div className="glass rounded-2xl p-4 mb-4">
         <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">AI summary</div>
         <p className="text-sm leading-relaxed">{call.summary}</p>
+      </div>
+
+      <div className="glass rounded-2xl p-4 mb-4">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground mb-2">
+          <Tag className="h-3 w-3" /> Tag this call
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {allTags.map((t) => (
+            <button
+              key={t}
+              onClick={() => { setTag(t); toast.success(`Tagged as ${t}`); }}
+              className={cn(
+                "px-3 py-1 rounded-full text-xs font-medium border capitalize transition-colors",
+                tag === t ? tagTone[t] : "bg-card text-muted-foreground border-border hover:text-foreground"
+              )}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-6">

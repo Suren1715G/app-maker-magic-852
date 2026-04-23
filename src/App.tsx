@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { DemoModeProvider } from "@/contexts/DemoModeContext";
+import { LocationProvider } from "@/contexts/LocationContext";
 import { ProtectedRoute } from "@/components/app/ProtectedRoute";
 import { AdminRoute } from "@/components/app/AdminRoute";
 import Auth from "./pages/auth/Auth";
@@ -39,7 +40,8 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <DemoModeProvider>
-            <Routes>
+            <LocationProvider>
+              <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/claim" element={<ClaimCode />} />
 
@@ -67,7 +69,8 @@ const App = () => (
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
-            </Routes>
+              </Routes>
+            </LocationProvider>
           </DemoModeProvider>
         </AuthProvider>
       </BrowserRouter>
