@@ -30,7 +30,6 @@ const Settings = () => {
   const [alwaysOn, setAlwaysOn] = useState(true);
   const [openTime, setOpenTime] = useState("08:00");
   const [closeTime, setCloseTime] = useState("18:00");
-  const [voice, setVoice] = useState("Aria · Friendly");
   const [greeting, setGreeting] = useState("Hi! You've reached SGS. How can I help today?");
   const [aiPrompt, setAiPrompt] = useState(
     "You are a friendly AI receptionist. Greet callers warmly, answer questions about our services, qualify leads, and offer to book an appointment. Keep replies under two sentences.",
