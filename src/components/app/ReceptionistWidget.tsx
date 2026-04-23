@@ -1,6 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Mic, MicOff, PhoneOff, Phone, Sparkles, X, Loader2 } from "lucide-react";
-import { useConversation, ConversationProvider, useConversationClientTool } from "@elevenlabs/react";
+import {
+  useConversation,
+  ConversationProvider,
+  useConversationClientTool,
+  type MessagePayload,
+  type DisconnectionDetails,
+} from "@elevenlabs/react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -45,9 +51,10 @@ function ReceptionistWidgetInner() {
 
   const conversation = useConversation({
     onConnect: () => toast.success("Connected to your AI receptionist"),
-    onDisconnect: () => {
+    onDisconnect: (details?: DisconnectionDetails) => {
       setElapsed(0);
       setMuted(false);
+      console.warn("Voice disconnected:", details);
       if (!disconnectToastShownRef.current) {
         disconnectToastShownRef.current = true;
         window.setTimeout(() => {
@@ -58,44 +65,16 @@ function ReceptionistWidgetInner() {
     onError: (err: unknown) => {
       console.warn("Voice error event:", err);
     },
-    onMessage: (msg: Record<string, unknown>) => {
-      if (typeof msg !== "object" || !msg) return;
-
-      if (
-        msg.type === "user_transcript" &&
-        typeof (msg as { user_transcription_event?: { user_transcript?: string } }).user_transcription_event
-          ?.user_transcript === "string"
-      ) {
-        const text = (msg as { user_transcription_event: { user_transcript: string } }).user_transcription_event
-          .user_transcript;
-        setTranscripts((p) => [...p, { id: crypto.randomUUID(), role: "user", text }]);
-        return;
-      }
-
-      if (
-        msg.type === "agent_response" &&
-        typeof (msg as { agent_response_event?: { agent_response?: string } }).agent_response_event
-          ?.agent_response === "string"
-      ) {
-        const text = (msg as { agent_response_event: { agent_response: string } }).agent_response_event
-          .agent_response;
-        setTranscripts((p) => [...p, { id: crypto.randomUUID(), role: "agent", text }]);
-        return;
-      }
-
-      if (
-        typeof msg.message === "string" &&
-        (msg.source === "user" || msg.source === "ai")
-      ) {
-        setTranscripts((p) => [
-          ...p,
-          {
-            id: crypto.randomUUID(),
-            role: msg.source === "user" ? "user" : "agent",
-            text: msg.message,
-          },
-        ]);
-      }
+    onMessage: (msg: MessagePayload) => {
+      if (!msg?.message) return;
+      setTranscripts((p) => [
+        ...p,
+        {
+          id: crypto.randomUUID(),
+          role: msg.role === "user" ? "user" : "agent",
+          text: msg.message,
+        },
+      ]);
     },
   });
 
