@@ -107,6 +107,8 @@ const Referrals = () => {
 
   const [picked, setPicked] = useState(Math.max(1, earned));
   const { off: pickedOff, price: pickedPrice } = priceFor(picked);
+  const animatedPrice = useCountUp(pickedPrice, 500);
+  const animatedSavings = useCountUp(pickedOff, 500);
   const isMax = picked >= 4;
   const currentDiscount = priceFor(earned).off;
   const currentBill = priceFor(earned).price;
