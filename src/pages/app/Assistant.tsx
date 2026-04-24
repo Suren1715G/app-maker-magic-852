@@ -99,23 +99,32 @@ const Assistant = () => {
 
   return (
     <AppShell>
-      {/* Hero */}
-      <header className="pt-4 pb-5 flex items-center gap-4">
-        <div className="relative shrink-0">
-          <span className="absolute inset-0 -m-2 rounded-full bg-gradient-hero opacity-30 blur-xl animate-pulse-glow pointer-events-none" />
-          <ReceptionistOrb speaking={busy} connected size={64} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="font-display text-3xl font-semibold leading-none">
-              <span className="prism-text">Jarvis</span>
-            </h1>
-            <span className="glass rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary flex items-center gap-1">
+      {/* Jarvis hero — 3D node network */}
+      <header className="relative -mx-5 mb-4 h-[260px] overflow-hidden">
+        <JarvisNetwork />
+        {/* Vignette so the network fades into the page */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(ellipse 70% 60% at 50% 45%, transparent 0%, hsl(var(--background) / 0.55) 70%, hsl(var(--background)) 100%)",
+          }}
+        />
+        {/* Centered title overlay */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="glass rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-primary flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-              Online
+              // 06 · ONLINE
             </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-1.5">Your in-app intelligence layer.</p>
+          <h1 className="font-display text-5xl font-semibold leading-none">
+            <span className="prism-text">Jarvis</span>
+          </h1>
+          <p className="text-xs text-muted-foreground mt-3 max-w-[280px]">
+            Your in-app intelligence layer. Always listening, always thinking.
+          </p>
         </div>
       </header>
 
