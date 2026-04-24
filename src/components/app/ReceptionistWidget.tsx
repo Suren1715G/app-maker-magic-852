@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { captureVisibleScreenAfterDelay } from "@/lib/screenContext";
 import { ReceptionistOrb } from "./ReceptionistOrb";
+import { JarvisNetwork } from "./JarvisNetwork";
 
 type Transcript = { id: string; role: "user" | "agent"; text: string };
 type VoiceTokenResponse = {
@@ -331,25 +332,30 @@ export function ReceptionistWidget() {
                 isConnected ? "max-h-[260px]" : "max-h-[75vh]",
               )}
             >
-              {/* Header */}
+              {/* Hero — 3D Jarvis network (only when idle) */}
               {!isConnected && (
-                <div className="relative flex items-center gap-2.5 px-4 py-3 border-b border-primary/15 overflow-hidden">
+                <div className="relative h-[200px] overflow-hidden">
+                  <JarvisNetwork />
+                  {/* Vignette so the network fades into the panel */}
                   <div
                     aria-hidden
-                    className="pointer-events-none absolute inset-0 opacity-60"
+                    className="pointer-events-none absolute inset-0"
                     style={{
                       background:
-                        "radial-gradient(ellipse 80% 100% at 0% 50%, hsl(var(--primary) / 0.18) 0%, transparent 70%)",
+                        "radial-gradient(ellipse 70% 60% at 50% 45%, transparent 0%, hsl(var(--card) / 0.55) 70%, hsl(var(--card)) 100%)",
                     }}
                   />
-                  <span className="relative h-9 w-9 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground flex items-center justify-center shadow-[0_0_16px_-2px_hsl(var(--primary)/0.7)]">
-                    <Sparkles className="h-4 w-4" />
-                  </span>
-                  <div className="relative flex-1 min-w-0">
-                    <div className="font-display text-base font-semibold leading-none">
-                      <span className="prism-text">Jarvis</span>
-                    </div>
-                    <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground flex items-center gap-1.5 mt-1">
+                  {/* Close button */}
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="absolute top-3 right-3 z-10 h-7 w-7 rounded-full glass flex items-center justify-center text-muted-foreground hover:text-foreground"
+                    aria-label="Close"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                  {/* Centered title overlay */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pointer-events-none">
+                    <span className="glass rounded-full px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.18em] text-primary flex items-center gap-1.5 mb-2.5">
                       <span
                         className={cn(
                           "h-1.5 w-1.5 rounded-full",
@@ -361,36 +367,28 @@ export function ReceptionistWidget() {
                         )}
                       />
                       {quotaExceeded
-                        ? "Voice unavailable"
+                        ? "Offline"
                         : connecting
-                          ? "Connecting…"
-                          : "Standing by"}
-                    </div>
+                          ? "Connecting"
+                          : "// Standing by"}
+                    </span>
+                    <h2 className="font-display text-4xl font-semibold leading-none">
+                      <span className="prism-text">Jarvis</span>
+                    </h2>
                   </div>
-                  <button
-                    onClick={() => setOpen(false)}
-                    className="relative text-muted-foreground hover:text-foreground"
-                    aria-label="Close"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
                 </div>
               )}
 
-              {/* Avatar / Orb */}
+              {/* Body copy / orb when in-call */}
               <div
                 className={cn(
                   "flex flex-col items-center justify-center gap-2",
-                  isConnected ? "pt-4 pb-2" : "py-6",
+                  isConnected ? "pt-4 pb-2" : "pb-3 px-5",
                 )}
               >
-                <ReceptionistOrb
-                  speaking={isSpeaking}
-                  connected={isConnected}
-                  size={isConnected ? 88 : 110}
-                />
-                <div className="text-center">
-                  {isConnected ? (
+                {isConnected ? (
+                  <>
+                    <ReceptionistOrb speaking={isSpeaking} connected size={88} />
                     <div className="flex flex-col items-center gap-0.5">
                       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                         {isSpeaking ? "Speaking…" : "Listening…"}
@@ -399,16 +397,16 @@ export function ReceptionistWidget() {
                         {formatTime(elapsed)}
                       </div>
                     </div>
-                  ) : callError ? (
-                    <div className="text-xs text-destructive max-w-[240px] px-3">
-                      {callError}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-muted-foreground max-w-[240px] px-3">
-                      Hands-free call. Just speak — Jarvis will answer back.
-                    </div>
-                  )}
-                </div>
+                  </>
+                ) : callError ? (
+                  <div className="text-xs text-destructive text-center max-w-[260px]">
+                    {callError}
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground text-center max-w-[260px]">
+                    Hands-free call. Just speak — Jarvis will answer back.
+                  </div>
+                )}
               </div>
 
               {/* Controls */}
