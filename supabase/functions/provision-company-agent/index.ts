@@ -116,16 +116,6 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Already provisioned?
-    const { data: existing } = await admin
-      .from("company_elevenlabs_agents")
-      .select("agent_id")
-      .eq("company_id", company_id)
-      .maybeSingle();
-    if (existing?.agent_id) {
-      return json({ ok: true, agent_id: existing.agent_id, created: false });
-    }
-
     // Get company name
     const { data: company } = await admin
       .from("companies")
@@ -133,6 +123,68 @@ Deno.serve(async (req) => {
       .eq("id", company_id)
       .maybeSingle();
     if (!company) return json({ error: "Company not found" }, 404);
+
+    // Already provisioned? Upgrade it instead of creating a new one.
+    const { data: existing } = await admin
+      .from("company_elevenlabs_agents")
+      .select("agent_id")
+      .eq("company_id", company_id)
+      .maybeSingle();
+
+    const lookupTool = buildAssistantTool(SUPABASE_URL, ASSISTANT_TOOL_SECRET, company_id);
+
+    if (existing?.agent_id) {
+      // Fetch current config, ensure lookup tool + company context block are present.
+      const curResp = await fetch(
+        `https://api.elevenlabs.io/v1/convai/agents/${existing.agent_id}`,
+        { headers: { "xi-api-key": ELEVENLABS_API_KEY } },
+      );
+      if (!curResp.ok) {
+        return json(
+          { error: "Could not fetch existing agent", detail: await curResp.text() },
+          502,
+        );
+      }
+      const cur = await curResp.json();
+      const curPrompt = cur?.conversation_config?.agent?.prompt ?? {};
+      const curTools = Array.isArray(curPrompt?.tools) ? curPrompt.tools : [];
+      const filteredTools = curTools.filter(
+        (t: any) => t?.name !== "lookup_business_data",
+      );
+      const promptText: string = curPrompt?.prompt ?? "";
+      const marker = `company_id="${company_id}"`;
+      const newPromptText = promptText.includes(marker)
+        ? promptText
+        : injectCompanyContext(promptText, company.name, company_id);
+
+      const patchResp = await fetch(
+        `https://api.elevenlabs.io/v1/convai/agents/${existing.agent_id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "xi-api-key": ELEVENLABS_API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            conversation_config: {
+              agent: {
+                prompt: {
+                  prompt: newPromptText,
+                  tools: [...filteredTools, lookupTool],
+                },
+              },
+            },
+          }),
+        },
+      );
+      if (!patchResp.ok) {
+        return json(
+          { error: "Failed to upgrade existing agent", detail: await patchResp.text() },
+          502,
+        );
+      }
+      return json({ ok: true, agent_id: existing.agent_id, created: false, upgraded: true });
+    }
 
     // Pull template config
     const template = await fetchTemplate(ELEVENLABS_API_KEY);
@@ -152,7 +204,7 @@ Deno.serve(async (req) => {
             prompt: injectCompanyContext(basePrompt?.prompt, company.name, company_id),
             tools: [
               ...(Array.isArray(basePrompt?.tools) ? basePrompt.tools : []),
-              buildAssistantTool(SUPABASE_URL, ASSISTANT_TOOL_SECRET, company_id),
+              lookupTool,
             ],
           },
         },
