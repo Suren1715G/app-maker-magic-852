@@ -405,7 +405,7 @@ export function ReceptionistWidget() {
                     </div>
                   ) : (
                     <div className="text-xs text-muted-foreground max-w-[240px] px-3">
-                      Hands-free call. Just speak — your AI receptionist will answer back.
+                      Hands-free call. Just speak — Jarvis will answer back.
                     </div>
                   )}
                 </div>
@@ -422,7 +422,12 @@ export function ReceptionistWidget() {
                   <button
                     onClick={startCall}
                     disabled={connecting || quotaExceeded}
-                    className="h-14 px-6 rounded-full bg-success text-success-foreground font-semibold text-sm flex items-center gap-2 shadow-lg hover:scale-105 transition-transform disabled:opacity-60"
+                    className={cn(
+                      "h-14 px-6 rounded-full font-semibold text-sm flex items-center gap-2 transition-transform hover:scale-105 disabled:opacity-60 disabled:hover:scale-100",
+                      quotaExceeded
+                        ? "bg-card border border-border text-muted-foreground"
+                        : "bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-[0_8px_28px_-6px_hsl(var(--primary)/0.7)]",
+                    )}
                   >
                     {quotaExceeded ? (
                       <>
