@@ -68,6 +68,24 @@ Deno.serve(async (req) => {
     }
 
     switch (action) {
+      case "data_index": {
+        // Tell the agent exactly what data sources are live vs not-yet-connected.
+        return json({
+          available: [
+            { topic: "calls", actions: ["call_stats", "recent_calls", "search_calls"], note: "Real call records from the receptionist." },
+            { topic: "leads", actions: ["leads_summary"], note: "Derived from calls tagged lead/booking/quote." },
+            { topic: "business_info", actions: ["business_info"], note: "Company name + provisioned phone numbers." },
+          ],
+          not_yet_connected: [
+            { topic: "sms_messages", note: "SMS/text messaging is not yet wired to live data. The Messages page currently shows demo content. Tell the user honestly that message history isn't tracked yet, and offer to navigate them to /sms." },
+            { topic: "reviews", note: "Reviews are not yet wired to live data. Page shows demo content. Offer to navigate to /reviews." },
+            { topic: "calendar_appointments", note: "Calendar/appointments are not yet wired to live data. Offer to navigate to /calendar." },
+            { topic: "notes_reminders", note: "Notes can be CREATED via perform_action(create_note) but cannot yet be listed/queried. Offer to navigate to /notes." },
+            { topic: "notifications", note: "Notifications feed is not yet queryable. Offer to navigate to /notifications." },
+          ],
+        });
+      }
+
       case "business_info": {
         const [{ data: company }, { data: phones }] = await Promise.all([
           admin.from("companies").select("name").eq("id", company_id).maybeSingle(),
