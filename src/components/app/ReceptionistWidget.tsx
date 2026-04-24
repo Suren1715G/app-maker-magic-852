@@ -242,7 +242,7 @@ export function ReceptionistWidget() {
 
       // Preview pass — find target without clicking.
       if (!confirmed) {
-        const probe = clickByLabel(label, { allowDestructive: true, dryRun: true });
+        const probe = await clickByLabel(label, { allowDestructive: true, dryRun: true });
         if (!probe.ok) {
           return `Could not find "${label}". ${probe.reason}${
             probe.candidates?.length
@@ -258,7 +258,7 @@ export function ReceptionistWidget() {
         }`;
       }
 
-      const result = clickByLabel(label, { allowDestructive: true });
+      const result = await clickByLabel(label, { allowDestructive: true });
       if (!result.ok) {
         return `Click failed: ${result.reason}${
           result.candidates?.length
@@ -338,7 +338,7 @@ export function ReceptionistWidget() {
       if (requestButton) {
         await highlightAndPress(requestButton, 850);
       } else {
-        const result = clickByLabel("Request a new location", { allowDestructive: true });
+        const result = await clickByLabel("Request a new location", { allowDestructive: true });
         if (!result.ok) {
           const controls = listVisibleControls();
           return `Could not open the location request form: ${result.reason ?? "button not found"}. Visible buttons: ${controls.clickable.slice(0, 12).join(", ")}. Do not claim it opened; ask the user to wait for Settings to finish loading and try again.`;
