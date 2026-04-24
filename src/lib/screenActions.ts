@@ -59,10 +59,39 @@ export type ClickResult = {
   candidates?: string[];
 };
 
-export function clickByLabel(
+// Visibly highlight + press the element so users can SEE Jarvis interacting.
+async function visibleClick(el: HTMLElement) {
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+  await new Promise((r) => window.setTimeout(r, 350));
+  const prev = {
+    outline: el.style.outline,
+    outlineOffset: el.style.outlineOffset,
+    boxShadow: el.style.boxShadow,
+    transition: el.style.transition,
+    transform: el.style.transform,
+  };
+  el.style.transition = "transform 150ms ease, box-shadow 150ms ease, outline-color 150ms ease";
+  el.style.outline = "3px solid hsl(var(--primary))";
+  el.style.outlineOffset = "3px";
+  el.style.boxShadow =
+    "0 0 0 6px hsl(var(--primary) / 0.25), 0 12px 32px hsl(var(--primary) / 0.35)";
+  await new Promise((r) => window.setTimeout(r, 600));
+  el.style.transform = "scale(0.96)";
+  await new Promise((r) => window.setTimeout(r, 150));
+  el.click();
+  el.style.transform = "scale(1)";
+  await new Promise((r) => window.setTimeout(r, 220));
+  el.style.outline = prev.outline;
+  el.style.outlineOffset = prev.outlineOffset;
+  el.style.boxShadow = prev.boxShadow;
+  el.style.transition = prev.transition;
+  el.style.transform = prev.transform;
+}
+
+export async function clickByLabel(
   label: string,
   opts?: { allowDestructive?: boolean; dryRun?: boolean },
-): ClickResult {
+): Promise<ClickResult> {
   if (!label || typeof document === "undefined") {
     return { ok: false, reason: "No label provided" };
   }
@@ -93,8 +122,7 @@ export function clickByLabel(
   }
 
   if (!opts?.dryRun) {
-    (best.el as HTMLElement).scrollIntoView({ block: "center", behavior: "smooth" });
-    (best.el as HTMLElement).click();
+    await visibleClick(best.el as HTMLElement);
   }
   return { ok: true, matched: best.label.trim().slice(0, 80), destructive: isDestructive };
 }
