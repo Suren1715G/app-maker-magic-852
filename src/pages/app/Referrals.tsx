@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { referrals as mockReferrals } from "@/data/mock";
 import { Copy, Link2, Send, Sparkles, Share2, Check } from "lucide-react";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 import { useAuth } from "@/contexts/AuthContext";
 import { ReferralCubes } from "@/components/app/ReferralCubes";
+import { supabase } from "@/integrations/supabase/client";
 
 const BASE_PRICE = 250;
 const TIERS = [
