@@ -123,6 +123,27 @@ export type Database = {
           },
         ]
       }
+      referral_codes: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -150,6 +171,7 @@ export type Database = {
     }
     Functions: {
       claim_access_code: { Args: { _code: string }; Returns: string }
+      generate_referral_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -157,6 +179,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      lookup_referral_code: { Args: { _code: string }; Returns: string }
       redeem_access_code: {
         Args: { _code: string; _user_id: string }
         Returns: string
