@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { captureVisibleScreenAfterDelay } from "@/lib/screenContext";
+import { clickByLabel, fillFieldByLabel, listVisibleControls } from "@/lib/screenActions";
 import { JarvisNetwork } from "./JarvisNetwork";
 
 type Transcript = { id: string; role: "user" | "agent"; text: string };
