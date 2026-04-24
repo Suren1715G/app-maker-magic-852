@@ -6,7 +6,6 @@ import { Send, Sparkles, Zap } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { stats, weeklySeries, leads, reviews } from "@/data/mock";
-import { JarvisNetwork } from "@/components/app/JarvisNetwork";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
