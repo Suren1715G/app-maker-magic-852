@@ -10,7 +10,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { captureVisibleScreenAfterDelay } from "@/lib/screenContext";
-import { clickByLabel, fillFieldByLabel, listVisibleControls } from "@/lib/screenActions";
 import { JarvisNetwork } from "./JarvisNetwork";
 
 type Transcript = { id: string; role: "user" | "agent"; text: string };
@@ -21,50 +20,6 @@ type VoiceTokenResponse = {
   code?: string;
   retryable?: boolean;
 };
-
-function wait(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-async function waitForEnabledElement(selector: string, timeoutMs = 5000) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const el = document.querySelector(selector) as HTMLElement | null;
-    const disabled = el?.matches("[disabled], [aria-disabled='true']") || (el as HTMLButtonElement | null)?.disabled;
-    if (el && !disabled) return el;
-    await wait(150);
-  }
-  return null;
-}
-
-// Visibly highlight an element so the user can see Jarvis interacting with it.
-async function highlightAndPress(el: HTMLElement, holdMs = 700) {
-  el.scrollIntoView({ block: "center", behavior: "smooth" });
-  await wait(450);
-  const prev = {
-    outline: el.style.outline,
-    outlineOffset: el.style.outlineOffset,
-    boxShadow: el.style.boxShadow,
-    transition: el.style.transition,
-    transform: el.style.transform,
-  };
-  el.style.transition = "transform 150ms ease, box-shadow 150ms ease, outline-color 150ms ease";
-  el.style.outline = "3px solid hsl(var(--primary))";
-  el.style.outlineOffset = "3px";
-  el.style.boxShadow = "0 0 0 6px hsl(var(--primary) / 0.25), 0 12px 32px hsl(var(--primary) / 0.35)";
-  await wait(holdMs);
-  // Press effect
-  el.style.transform = "scale(0.96)";
-  await wait(160);
-  el.click();
-  el.style.transform = "scale(1)";
-  await wait(260);
-  el.style.outline = prev.outline;
-  el.style.outlineOffset = prev.outlineOffset;
-  el.style.boxShadow = prev.boxShadow;
-  el.style.transition = prev.transition;
-  el.style.transform = prev.transform;
-}
 
 function isQuotaMessage(message?: string | null) {
   return /quota|credits? remaining|payment required|insufficient credits/i.test(message ?? "");
@@ -230,191 +185,6 @@ export function ReceptionistWidget() {
     });
   });
 
-  // Tool: click any visible button/link/tab/switch by its visible label.
-  // Confirmation flow: AI calls confirmed=false first → we return what WOULD happen.
-  // After verbal user "yes", AI calls again with confirmed=true to actually click.
-  useConversationClientTool(
-    "click_element",
-    async (params: { label?: string; confirmed?: boolean | string }) => {
-      const label = (params?.label ?? "").trim();
-      const confirmed = params?.confirmed === true || params?.confirmed === "true";
-      if (!label) return "Error: label is required.";
-
-      // Preview pass — find target without clicking.
-      if (!confirmed) {
-        const probe = await clickByLabel(label, { allowDestructive: true, dryRun: true });
-        if (!probe.ok) {
-          return `Could not find "${label}". ${probe.reason}${
-            probe.candidates?.length
-              ? ` Visible buttons include: ${probe.candidates.slice(0, 10).join(", ")}.`
-              : ""
-          } Ask the user to clarify.`;
-        }
-        // Don't actually click — undo by stopping here. We just return preview.
-        return `PREVIEW (not yet clicked): I will click "${probe.matched ?? label}".${
-          probe.destructive
-            ? " This looks DESTRUCTIVE — repeat it back to the user and require an explicit yes before calling again with confirmed=true."
-            : " Confirm with the user, then call again with confirmed=true."
-        }`;
-      }
-
-      const result = await clickByLabel(label, { allowDestructive: true });
-      if (!result.ok) {
-        return `Click failed: ${result.reason}${
-          result.candidates?.length
-            ? ` Visible buttons: ${result.candidates.slice(0, 10).join(", ")}.`
-            : ""
-        }`;
-      }
-      const snap = await captureVisibleScreenAfterDelay(900, 6000);
-      return [
-        `Clicked "${result.matched ?? label}".`,
-        "Updated screen below — describe to the user only what's actually here.",
-        "----- BEGIN VISIBLE SCREEN -----",
-        snap.content || "(empty)",
-        "----- END VISIBLE SCREEN -----",
-      ].join("\n");
-    },
-  );
-
-  // Tool: type into a field by its label/placeholder.
-  useConversationClientTool(
-    "fill_field",
-    async (params: { label?: string; value?: string; confirmed?: boolean | string }) => {
-      const label = (params?.label ?? "").trim();
-      const value = String(params?.value ?? "");
-      const confirmed = params?.confirmed === true || params?.confirmed === "true";
-      if (!label) return "Error: label is required.";
-      if (value === "") return "Error: value is required.";
-
-      if (!confirmed) {
-        const controls = listVisibleControls();
-        const matchHint = controls.fields.find((f) =>
-          f.toLowerCase().includes(label.toLowerCase()),
-        );
-        return `PREVIEW (not yet typed): I will set "${label}"${
-          matchHint ? ` (matched field: "${matchHint}")` : ""
-        } to "${value}". Confirm with the user, then call again with confirmed=true.`;
-      }
-
-      const result = await fillFieldByLabel(label, value);
-      if (!result.ok) {
-        return `Fill failed: ${result.reason}${
-          result.candidates?.length
-            ? ` Visible fields: ${result.candidates.slice(0, 10).join(", ")}.`
-            : ""
-        }`;
-      }
-      return `Filled "${result.matchedLabel ?? label}" with "${value}". Remind the user to click Save/Submit if needed.`;
-    },
-  );
-
-  // Tool: list everything Jarvis can act on right now (buttons + fields).
-  useConversationClientTool("list_actions", async () => {
-    const c = listVisibleControls();
-    return JSON.stringify({
-      clickable_elements: c.clickable,
-      input_fields: c.fields,
-      hint: "To click, call click_element({label, confirmed:false}) then with confirmed:true. To type, call fill_field({label, value, confirmed:false}) then confirmed:true.",
-    });
-  });
-
-  // Purpose-built tool for the request-location flow. This removes ambiguity:
-  // Jarvis must visibly open the Settings page and press the real button before
-  // collecting form fields from the user.
-  useConversationClientTool(
-    "open_location_request_form",
-    async (params: {
-      confirmed?: boolean | string;
-      location_name?: string;
-      locations_wanted?: number | string;
-      note?: string;
-      submit?: boolean | string;
-    }) => {
-      const confirmed = params?.confirmed === true || params?.confirmed === "true";
-      if (!confirmed) {
-        return 'PREVIEW (not yet opened): I will open Settings, click the visible "Request a new location" button, then type each field on screen so the user can watch. Confirm with the user, then call again with confirmed=true and pass the field values you collected.';
-      }
-
-      navigate("/settings");
-      toast.success("Opening location request form");
-      await wait(900);
-
-      const requestButton = await waitForEnabledElement('[data-jarvis-action="request-location"]', 6000);
-      if (requestButton) {
-        await highlightAndPress(requestButton, 850);
-      } else {
-        const result = await clickByLabel("Request a new location", { allowDestructive: true });
-        if (!result.ok) {
-          const controls = listVisibleControls();
-          return `Could not open the location request form: ${result.reason ?? "button not found"}. Visible buttons: ${controls.clickable.slice(0, 12).join(", ")}. Do not claim it opened; ask the user to wait for Settings to finish loading and try again.`;
-        }
-      }
-
-      const formField = await waitForEnabledElement('input[aria-label="Location name"]', 3000);
-      if (!formField) {
-        const controls = listVisibleControls();
-        return `Click did not open the location request form. Visible buttons: ${controls.clickable.slice(0, 12).join(", ")}. Do not claim it opened; ask the user to try again after Settings finishes loading.`;
-      }
-
-      // Optional: visibly type each field if values were provided.
-      const filled: string[] = [];
-      const locName = (params?.location_name ?? "").toString().trim();
-      if (locName) {
-        await wait(400);
-        const r = await fillFieldByLabel("Location name", locName, { animate: true, charDelayMs: 60 });
-        if (r.ok) filled.push(`Location name = "${locName}"`);
-      }
-
-      const wantedRaw = params?.locations_wanted;
-      const wanted =
-        typeof wantedRaw === "number"
-          ? wantedRaw
-          : typeof wantedRaw === "string" && wantedRaw.trim() !== ""
-            ? Number(wantedRaw)
-            : null;
-      if (wanted && Number.isFinite(wanted) && wanted >= 1) {
-        await wait(350);
-        const r = await fillFieldByLabel("How many new locations", String(Math.floor(wanted)), {
-          animate: false,
-        });
-        if (r.ok) filled.push(`How many new locations = ${Math.floor(wanted)}`);
-      }
-
-      const note = (params?.note ?? "").toString().trim();
-      if (note) {
-        await wait(350);
-        const r = await fillFieldByLabel("Anything we should know", note, {
-          animate: true,
-          charDelayMs: 35,
-        });
-        if (r.ok) filled.push(`Note = "${note}"`);
-      }
-
-      const shouldSubmit = params?.submit === true || params?.submit === "true";
-      let submitted = false;
-      if (shouldSubmit && locName) {
-        await wait(450);
-        const submitRes = await clickByLabel("Send request", { allowDestructive: true });
-        submitted = submitRes.ok;
-      }
-
-      const snap = await captureVisibleScreenAfterDelay(700, 6000);
-      return [
-        'Opened the "Request a new location" form on screen.',
-        filled.length ? `Typed visibly: ${filled.join("; ")}.` : "No field values were provided yet.",
-        shouldSubmit
-          ? submitted
-            ? 'Pressed "Send request" — confirm to the user only what the screen now shows.'
-            : 'Did NOT submit — "Send request" button could not be clicked. Do not claim it was sent.'
-          : "Form is open and ready. If the user wants to send it, call this tool again with submit=true.",
-        "----- BEGIN VISIBLE SCREEN -----",
-        snap.content || "(empty)",
-        "----- END VISIBLE SCREEN -----",
-      ].join("\n");
-    },
-  );
-
   const status = conversation.status;
   const isConnected = status === "connected";
   const isSpeaking = conversation.isSpeaking;
@@ -499,45 +269,18 @@ export function ReceptionistWidget() {
         "- get_current_screen(): returns the user's currently visible screen content. CALL THIS whenever the user asks about what's on their screen, what they see, what's in front of them, or anything specific to the current page.",
         "- navigate_to(destination): opens a page in the app (home, calls, calendar, sms, leads, reviews, analytics, notifications, billing, referrals, support, assistant, settings).",
         "- get_current_time(): returns the current date, day, and time.",
-        "- list_actions(): returns the buttons and input fields visible on the current screen. Use this BEFORE click_element or fill_field if you're not sure what's available.",
-        "- click_element({label, confirmed}): clicks any visible button, link, tab, or switch by its visible label or aria-label. ALWAYS call with confirmed=false FIRST to preview, repeat what you'll click to the user, get a verbal yes, then call again with confirmed=true.",
-        "- fill_field({label, value, confirmed}): types into any visible input or textarea by its label/placeholder. ALWAYS call with confirmed=false FIRST, repeat what you'll type, get verbal yes, then call again with confirmed=true. After filling, you usually still need to click_element('Save') or 'Submit'.",
-        "- open_location_request_form({confirmed}): purpose-built tool for adding/requesting a new location. It navigates to Settings and physically clicks the real 'Request a new location' button. ALWAYS call with confirmed=false first, get yes, then confirmed=true.",
-        "- perform_action: server-side actions for things WITHOUT an on-screen form — tagging a call, sending an SMS, or creating a note/reminder. Same confirm-first flow. DO NOT use perform_action for things the user can fill out on a real page (e.g. requesting a new location or phone number — walk through the actual form instead).",
+        "- perform_action: server-side actions like tagging a call, sending an SMS, or creating a note/reminder. ALWAYS confirm-first: call with confirmed=false to preview, repeat to the user, get a verbal yes, then call again with confirmed=true.",
         "",
         "## Rules",
         "- You CAN see the user's screen — never tell them you cannot. Always call get_current_screen first if uncertain.",
         "- Only state facts that appear in the screen tool result. Do not invent counts, names, numbers, or items.",
         "- After navigating, call get_current_screen to describe the new page.",
-        "- For ANY click_element or fill_field, use confirm-first: preview → user says yes → execute. Never skip.",
-        "- For DESTRUCTIVE labels (delete, remove, sign out, cancel, disconnect, reset) — repeat the exact button text and require an unmistakable yes.",
-        "- After click_element or fill_field, briefly describe what changed using the returned screen snapshot.",
-        "- If the user asks you to do something on a different page, navigate_to that page first, then list_actions, then act.",
-        "- Prefer the on-screen UI flow whenever a form exists for what the user wants. Walk them through it field by field so they can see it happen. Only fall back to perform_action when there is no UI for it.",
+        "- You can navigate the user to any page so they can take action themselves, but you DO NOT click buttons, toggle switches, or fill in forms for them. If the user wants to change a setting, request a new location, toggle notifications, etc., guide them verbally through where to go and what to press.",
+        "- For things like 'request a new location' or 'request a new phone number', navigate_to('settings') and tell the user exactly where the form is and what to fill in — do not claim to have opened or submitted it yourself.",
         "- Be brief and conversational.",
         "",
-        "## Workflow recipe — Request a new location",
-        "When the user asks to request a new location (or phone number), DO NOT use perform_action and DO NOT claim you opened/submitted anything unless a tool result confirms it. Walk through the real Settings form:",
-        "1. open_location_request_form({confirmed:false}) to preview that you will visibly open Settings and click 'Request a new location'. Ask for yes.",
-        "2. On yes, call open_location_request_form({confirmed:true}). Wait for the tool result. If it fails, do not claim success — read the error and ask for help.",
-        "3. Ask the user the location name (and how to spell it). Repeat the spelling back, then fill_field('Location name', <value>) with confirm-first.",
-        "4. Ask how many new locations they want. Confirm the number, then fill_field('How many new locations?', <number>).",
-        "5. Ask if there's anything else we should know (service area, expected call volume, timing). If yes, fill_field('Anything we should know', <value>). If they say no, skip this field.",
-        "6. Read back all three values and ask 'Should I send the request?'. On yes, click_element('Send request') with confirmed=true.",
-        "7. After it sends, the screen will show a success card with a 'Book a meeting' button. Tell the user the request was received and ASK: 'Want me to open the Calendly booking page so you can pick a time to chat about pricing and setup?' On yes, click_element('Book a meeting') with confirmed=true.",
-        "",
-        "## Workflow recipe — Toggle dark / light mode",
-        "The app has a working dark/light theme switch. NEVER tell the user you can't change the theme.",
-        "1. navigate_to('settings').",
-        "2. The 'Appearance' section contains a 'Dark mode' switch. Use confirm-first click_element('Dark mode'): 'I will toggle the Dark mode switch — that flips the whole app between dark and light. Want me to do it?'",
-        "3. On yes, click_element('Dark mode', confirmed=true). Confirm the change with the user based on the returned screen.",
-        "",
-        "## General principle",
-        "If the user asks you to flip a switch, change a setting, fill out a form, or click anything visible in the app, the answer is YES — navigate_to the right page, list_actions if unsure, then click_element / fill_field with confirm-first. NEVER refuse a UI action just because you don't recognise it; check list_actions first.",
-        "",
         "## Truthfulness — CRITICAL",
-        "NEVER tell the user something has been done unless you actually called the tool with confirmed=true and got back a success result. Do not say 'I submitted', 'I clicked', 'I sent', 'done', 'all set' unless the tool result literally confirms it. If a click or fill failed, read the error and either retry or ask the user for help. If you can't see the control, call list_actions first — never say 'I don't see it' without checking.",
-        "Toggle switches (like 'Push notifications', 'Dark mode', 'Two-factor authentication') ARE clickable elements — they show up in list_actions and you click them with click_element using their visible label. Don't claim a switch isn't there before calling list_actions.",
+        "NEVER tell the user something has been done unless a tool result literally confirms it. Do not say 'I clicked', 'I submitted', 'I toggled' — you do not control the UI. The user clicks and types themselves. Your job is to guide, navigate, read the screen, and run server-side actions like SMS or notes via perform_action.",
         "",
         `## Current context`,
         `Date/time: ${now.toLocaleString(undefined, { dateStyle: "full", timeStyle: "long" })} (${tz}).`,
