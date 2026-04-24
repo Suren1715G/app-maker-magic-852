@@ -333,24 +333,43 @@ export function ReceptionistWidget() {
             >
               {/* Header */}
               {!isConnected && (
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-border/60">
-                  <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center">
+                <div className="relative flex items-center gap-2.5 px-4 py-3 border-b border-primary/15 overflow-hidden">
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 opacity-60"
+                    style={{
+                      background:
+                        "radial-gradient(ellipse 80% 100% at 0% 50%, hsl(var(--primary) / 0.18) 0%, transparent 70%)",
+                    }}
+                  />
+                  <span className="relative h-9 w-9 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground flex items-center justify-center shadow-[0_0_16px_-2px_hsl(var(--primary)/0.7)]">
                     <Sparkles className="h-4 w-4" />
                   </span>
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold leading-tight">AI Receptionist</div>
-                    <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+                  <div className="relative flex-1 min-w-0">
+                    <div className="font-display text-base font-semibold leading-none">
+                      <span className="prism-text">Jarvis</span>
+                    </div>
+                    <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground flex items-center gap-1.5 mt-1">
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          quotaExceeded
+                            ? "bg-destructive"
+                            : connecting
+                              ? "bg-accent animate-pulse"
+                              : "bg-success animate-pulse",
+                        )}
+                      />
                       {quotaExceeded
                         ? "Voice unavailable"
                         : connecting
                           ? "Connecting…"
-                          : "Tap call to start"}
+                          : "Standing by"}
                     </div>
                   </div>
                   <button
                     onClick={() => setOpen(false)}
-                    className="text-muted-foreground hover:text-foreground"
+                    className="relative text-muted-foreground hover:text-foreground"
                     aria-label="Close"
                   >
                     <X className="h-4 w-4" />
