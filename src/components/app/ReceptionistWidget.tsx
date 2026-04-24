@@ -275,6 +275,38 @@ export function ReceptionistWidget() {
     });
   });
 
+  // Purpose-built tool for the request-location flow. This removes ambiguity:
+  // Jarvis must visibly open the Settings page and press the real button before
+  // collecting form fields from the user.
+  useConversationClientTool(
+    "open_location_request_form",
+    async (params: { confirmed?: boolean | string }) => {
+      const confirmed = params?.confirmed === true || params?.confirmed === "true";
+      if (!confirmed) {
+        return 'PREVIEW (not yet opened): I will open Settings and click the visible "Request a new location" button so you can watch the form appear. Confirm with the user, then call again with confirmed=true.';
+      }
+
+      navigate("/settings");
+      toast.success("Opening location request form");
+      await new Promise((resolve) => window.setTimeout(resolve, 1200));
+
+      const result = clickByLabel("Request a new location", { allowDestructive: true });
+      if (!result.ok) {
+        const controls = listVisibleControls();
+        return `Could not open the location request form: ${result.reason ?? "button not found"}. Visible buttons: ${controls.clickable.slice(0, 12).join(", ")}. Do not claim it opened; ask the user to scroll to Settings or try again.`;
+      }
+
+      const snap = await captureVisibleScreenAfterDelay(700, 6000);
+      return [
+        'Opened the real "Request a new location" form on screen.',
+        "Next: ask the user for the location name and spelling, number of locations, and any note. Then fill the visible fields one by one with fill_field confirm-first.",
+        "----- BEGIN VISIBLE SCREEN -----",
+        snap.content || "(empty)",
+        "----- END VISIBLE SCREEN -----",
+      ].join("\n");
+    },
+  );
+
   const status = conversation.status;
   const isConnected = status === "connected";
   const isSpeaking = conversation.isSpeaking;
@@ -362,6 +394,7 @@ export function ReceptionistWidget() {
         "- list_actions(): returns the buttons and input fields visible on the current screen. Use this BEFORE click_element or fill_field if you're not sure what's available.",
         "- click_element({label, confirmed}): clicks any visible button, link, tab, or switch by its visible label or aria-label. ALWAYS call with confirmed=false FIRST to preview, repeat what you'll click to the user, get a verbal yes, then call again with confirmed=true.",
         "- fill_field({label, value, confirmed}): types into any visible input or textarea by its label/placeholder. ALWAYS call with confirmed=false FIRST, repeat what you'll type, get verbal yes, then call again with confirmed=true. After filling, you usually still need to click_element('Save') or 'Submit'.",
+        "- open_location_request_form({confirmed}): purpose-built tool for adding/requesting a new location. It navigates to Settings and physically clicks the real 'Request a new location' button. ALWAYS call with confirmed=false first, get yes, then confirmed=true.",
         "- perform_action: server-side actions for things WITHOUT an on-screen form — tagging a call, sending an SMS, or creating a note/reminder. Same confirm-first flow. DO NOT use perform_action for things the user can fill out on a real page (e.g. requesting a new location or phone number — walk through the actual form instead).",
         "",
         "## Rules",
@@ -376,9 +409,9 @@ export function ReceptionistWidget() {
         "- Be brief and conversational.",
         "",
         "## Workflow recipe — Request a new location",
-        "When the user asks to request a new location (or phone number), DO NOT use perform_action. Walk through the real Settings form:",
-        "1. navigate_to('settings'). Then get_current_screen to confirm you're on Settings.",
-        "2. click_element('Request a new location') with confirm-first. After click, the form opens with three fields: 'Location name', 'How many new locations?', 'Anything we should know?'.",
+        "When the user asks to request a new location (or phone number), DO NOT use perform_action and DO NOT claim you opened/submitted anything unless a tool result confirms it. Walk through the real Settings form:",
+        "1. open_location_request_form({confirmed:false}) to preview that you will visibly open Settings and click 'Request a new location'. Ask for yes.",
+        "2. On yes, call open_location_request_form({confirmed:true}). Wait for the tool result. If it fails, do not claim success — read the error and ask for help.",
         "3. Ask the user the location name (and how to spell it). Repeat the spelling back, then fill_field('Location name', <value>) with confirm-first.",
         "4. Ask how many new locations they want. Confirm the number, then fill_field('How many new locations?', <number>).",
         "5. Ask if there's anything else we should know (service area, expected call volume, timing). If yes, fill_field('Anything we should know', <value>). If they say no, skip this field.",
