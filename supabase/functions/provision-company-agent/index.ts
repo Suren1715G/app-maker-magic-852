@@ -263,6 +263,7 @@ Deno.serve(async (req) => {
 
     const lookupTool = buildAssistantTool(SUPABASE_URL, ASSISTANT_TOOL_SECRET, company_id);
     const actionTool = buildActionTool(SUPABASE_URL, ASSISTANT_TOOL_SECRET, company_id);
+    const clientTools = buildClientTools();
 
     if (existing?.agent_id) {
       // Fetch current config, ensure lookup tool + company context block are present.
@@ -281,7 +282,9 @@ Deno.serve(async (req) => {
       const curTools = Array.isArray(curPrompt?.tools) ? curPrompt.tools : [];
       const filteredTools = curTools.filter(
         (t: any) =>
-          t?.name !== "lookup_business_data" && t?.name !== "perform_action",
+          t?.name !== "lookup_business_data" &&
+          t?.name !== "perform_action" &&
+          !clientTools.some((clientTool) => clientTool.name === t?.name),
       );
       const promptText: string = curPrompt?.prompt ?? "";
       // Strip any prior injected block so we always re-inject the latest version
@@ -304,7 +307,7 @@ Deno.serve(async (req) => {
               agent: {
                 prompt: {
                   prompt: newPromptText,
-                  tools: [...filteredTools, lookupTool, actionTool],
+                  tools: [...filteredTools, lookupTool, actionTool, ...clientTools],
                 },
               },
             },
@@ -340,6 +343,7 @@ Deno.serve(async (req) => {
               ...(Array.isArray(basePrompt?.tools) ? basePrompt.tools : []),
               lookupTool,
               actionTool,
+              ...clientTools,
             ],
           },
         },
