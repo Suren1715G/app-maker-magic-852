@@ -12,6 +12,7 @@ import {
   Plus,
   Trash2,
   User,
+  MapPin,
 } from "lucide-react";
 import { calls, bookings, sms } from "@/data/mock";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,15 @@ type PhoneRow = {
   created_at: string;
 };
 
+type LocReqRow = {
+  id: string;
+  location_name: string;
+  locations_wanted: number;
+  note: string | null;
+  status: "new" | "contacted" | "scheduled" | "closed";
+  created_at: string;
+};
+
 const MasterCompanyDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<Detail | null>(null);
@@ -53,6 +63,7 @@ const MasterCompanyDetail = () => {
   const [phones, setPhones] = useState<PhoneRow[]>([]);
   const [newLabel, setNewLabel] = useState("");
   const [newPhone, setNewPhone] = useState("");
+  const [locReqs, setLocReqs] = useState<LocReqRow[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -70,6 +81,7 @@ const MasterCompanyDetail = () => {
       }
       setData(row as Detail);
       await loadPhones(row.id);
+      await loadLocReqs(row.id);
     })();
   }, [id]);
 
@@ -80,6 +92,22 @@ const MasterCompanyDetail = () => {
       .eq("company_id", cid)
       .order("created_at", { ascending: true });
     setPhones((data ?? []) as PhoneRow[]);
+  };
+
+  const loadLocReqs = async (cid: string) => {
+    const { data } = await supabase
+      .from("location_requests")
+      .select("id, location_name, locations_wanted, note, status, created_at")
+      .eq("company_id", cid)
+      .order("created_at", { ascending: false });
+    setLocReqs((data ?? []) as LocReqRow[]);
+  };
+
+  const setReqStatus = async (rid: string, status: LocReqRow["status"]) => {
+    const { error } = await supabase.from("location_requests").update({ status }).eq("id", rid);
+    if (error) return toast.error(error.message);
+    toast.success(`Marked ${status}`);
+    if (id) await loadLocReqs(id);
   };
 
   const setStatus = async (pid: string, status: PhoneRow["status"]) => {
@@ -281,6 +309,58 @@ const MasterCompanyDetail = () => {
                   </Button>
                 </div>
               </div>
+            </section>
+
+            <section className="glass rounded-2xl p-5">
+              <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5" /> Location requests ({locReqs.length})
+              </h2>
+              {locReqs.length === 0 && (
+                <p className="text-sm text-muted-foreground">No requests yet.</p>
+              )}
+              <ul className="space-y-3">
+                {locReqs.map((r) => {
+                  const tone =
+                    r.status === "scheduled"
+                      ? "bg-success/15 text-success"
+                      : r.status === "contacted"
+                        ? "bg-accent/15 text-accent"
+                        : r.status === "closed"
+                          ? "bg-muted text-muted-foreground"
+                          : "bg-primary/15 text-primary";
+                  return (
+                    <li key={r.id} className="rounded-lg border border-border/60 p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{r.location_name}</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {r.locations_wanted} location{r.locations_wanted > 1 ? "s" : ""} · {new Date(r.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full shrink-0 ${tone}`}>
+                          {r.status}
+                        </span>
+                      </div>
+                      {r.note && (
+                        <div className="text-[11px] text-muted-foreground mb-2 whitespace-pre-wrap">{r.note}</div>
+                      )}
+                      <div className="flex gap-1.5 flex-wrap">
+                        {(["new", "contacted", "scheduled", "closed"] as const)
+                          .filter((s) => s !== r.status)
+                          .map((s) => (
+                            <button
+                              key={s}
+                              onClick={() => setReqStatus(r.id, s)}
+                              className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-secondary text-foreground/80 hover:bg-secondary/70"
+                            >
+                              Mark {s}
+                            </button>
+                          ))}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             </section>
           </div>
 
