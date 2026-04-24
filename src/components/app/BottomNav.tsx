@@ -19,7 +19,7 @@ const more = [
   { to: "/analytics", label: "Analytics", icon: BarChart3, hint: "Charts & ROI" },
   { to: "/reviews", label: "Reviews", icon: Star, hint: "Google reviews" },
   { to: "/notifications", label: "Notifications", icon: Bell, hint: "Alerts & prefs" },
-  { to: "/assistant", label: "AI Assistant", icon: Bot, hint: "Ask your data" },
+  { to: "/assistant", label: "Jarvis", icon: Bot, hint: "Your AI analyst" },
   { to: "/billing", label: "Billing", icon: CreditCard, hint: "Plan & invoices" },
   { to: "/referrals", label: "Referrals", icon: Gift, hint: "Earn free months" },
   { to: "/support", label: "Support", icon: LifeBuoy, hint: "Help & FAQ" },
