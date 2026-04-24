@@ -297,7 +297,7 @@ export function ReceptionistWidget() {
         } to "${value}". Confirm with the user, then call again with confirmed=true.`;
       }
 
-      const result = fillFieldByLabel(label, value);
+      const result = await fillFieldByLabel(label, value);
       if (!result.ok) {
         return `Fill failed: ${result.reason}${
           result.candidates?.length
