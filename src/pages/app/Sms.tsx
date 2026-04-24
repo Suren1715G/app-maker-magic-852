@@ -196,6 +196,7 @@ const Sms = () => {
   return (
     <AppShell>
       <PageHeader title="Messages" subtitle="Two-way conversations the AI handled." />
+      {loading && <p className="text-xs text-muted-foreground mb-2">Loading messages…</p>}
       {(() => {
         const totalThreads = threads.length;
         const totalUnread = threads.reduce((a, t) => a + t.unread, 0);
