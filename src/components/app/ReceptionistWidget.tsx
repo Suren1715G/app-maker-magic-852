@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { captureVisibleScreenAfterDelay } from "@/lib/screenContext";
+import { clickByLabel, fillFieldByLabel, listVisibleControls } from "@/lib/screenActions";
 import { JarvisNetwork } from "./JarvisNetwork";
 
 type Transcript = { id: string; role: "user" | "agent"; text: string };
@@ -185,6 +186,95 @@ export function ReceptionistWidget() {
     });
   });
 
+  // Tool: click any visible button/link/tab/switch by its visible label.
+  // Confirmation flow: AI calls confirmed=false first → we return what WOULD happen.
+  // After verbal user "yes", AI calls again with confirmed=true to actually click.
+  useConversationClientTool(
+    "click_element",
+    async (params: { label?: string; confirmed?: boolean | string }) => {
+      const label = (params?.label ?? "").trim();
+      const confirmed = params?.confirmed === true || params?.confirmed === "true";
+      if (!label) return "Error: label is required.";
+
+      // Preview pass — find target without clicking.
+      if (!confirmed) {
+        const probe = clickByLabel(label, { allowDestructive: true, dryRun: true });
+        if (!probe.ok) {
+          return `Could not find "${label}". ${probe.reason}${
+            probe.candidates?.length
+              ? ` Visible buttons include: ${probe.candidates.slice(0, 10).join(", ")}.`
+              : ""
+          } Ask the user to clarify.`;
+        }
+        // Don't actually click — undo by stopping here. We just return preview.
+        return `PREVIEW (not yet clicked): I will click "${probe.matched ?? label}".${
+          probe.destructive
+            ? " This looks DESTRUCTIVE — repeat it back to the user and require an explicit yes before calling again with confirmed=true."
+            : " Confirm with the user, then call again with confirmed=true."
+        }`;
+      }
+
+      const result = clickByLabel(label, { allowDestructive: true });
+      if (!result.ok) {
+        return `Click failed: ${result.reason}${
+          result.candidates?.length
+            ? ` Visible buttons: ${result.candidates.slice(0, 10).join(", ")}.`
+            : ""
+        }`;
+      }
+      const snap = await captureVisibleScreenAfterDelay(900, 6000);
+      return [
+        `Clicked "${result.matched ?? label}".`,
+        "Updated screen below — describe to the user only what's actually here.",
+        "----- BEGIN VISIBLE SCREEN -----",
+        snap.content || "(empty)",
+        "----- END VISIBLE SCREEN -----",
+      ].join("\n");
+    },
+  );
+
+  // Tool: type into a field by its label/placeholder.
+  useConversationClientTool(
+    "fill_field",
+    async (params: { label?: string; value?: string; confirmed?: boolean | string }) => {
+      const label = (params?.label ?? "").trim();
+      const value = String(params?.value ?? "");
+      const confirmed = params?.confirmed === true || params?.confirmed === "true";
+      if (!label) return "Error: label is required.";
+      if (value === "") return "Error: value is required.";
+
+      if (!confirmed) {
+        const controls = listVisibleControls();
+        const matchHint = controls.fields.find((f) =>
+          f.toLowerCase().includes(label.toLowerCase()),
+        );
+        return `PREVIEW (not yet typed): I will set "${label}"${
+          matchHint ? ` (matched field: "${matchHint}")` : ""
+        } to "${value}". Confirm with the user, then call again with confirmed=true.`;
+      }
+
+      const result = fillFieldByLabel(label, value);
+      if (!result.ok) {
+        return `Fill failed: ${result.reason}${
+          result.candidates?.length
+            ? ` Visible fields: ${result.candidates.slice(0, 10).join(", ")}.`
+            : ""
+        }`;
+      }
+      return `Filled "${result.matchedLabel ?? label}" with "${value}". Remind the user to click Save/Submit if needed.`;
+    },
+  );
+
+  // Tool: list everything Jarvis can act on right now (buttons + fields).
+  useConversationClientTool("list_actions", async () => {
+    const c = listVisibleControls();
+    return JSON.stringify({
+      clickable_elements: c.clickable,
+      input_fields: c.fields,
+      hint: "To click, call click_element({label, confirmed:false}) then with confirmed:true. To type, call fill_field({label, value, confirmed:false}) then confirmed:true.",
+    });
+  });
+
   const status = conversation.status;
   const isConnected = status === "connected";
   const isSpeaking = conversation.isSpeaking;
@@ -269,11 +359,19 @@ export function ReceptionistWidget() {
         "- get_current_screen(): returns the user's currently visible screen content. CALL THIS whenever the user asks about what's on their screen, what they see, what's in front of them, or anything specific to the current page.",
         "- navigate_to(destination): opens a page in the app (home, calls, calendar, sms, leads, reviews, analytics, notifications, billing, referrals, support, assistant, settings).",
         "- get_current_time(): returns the current date, day, and time.",
+        "- list_actions(): returns the buttons and input fields visible on the current screen. Use this BEFORE click_element or fill_field if you're not sure what's available.",
+        "- click_element({label, confirmed}): clicks any visible button, link, tab, or switch by its visible label or aria-label. ALWAYS call with confirmed=false FIRST to preview, repeat what you'll click to the user, get a verbal yes, then call again with confirmed=true.",
+        "- fill_field({label, value, confirmed}): types into any visible input or textarea by its label/placeholder. ALWAYS call with confirmed=false FIRST, repeat what you'll type, get verbal yes, then call again with confirmed=true. After filling, you usually still need to click_element('Save') or 'Submit'.",
+        "- perform_action: server-side actions (tag a call, send SMS, create note, request a phone/location). Same confirm-first flow.",
         "",
         "## Rules",
         "- You CAN see the user's screen — never tell them you cannot. Always call get_current_screen first if uncertain.",
         "- Only state facts that appear in the screen tool result. Do not invent counts, names, numbers, or items.",
         "- After navigating, call get_current_screen to describe the new page.",
+        "- For ANY click_element or fill_field, use confirm-first: preview → user says yes → execute. Never skip.",
+        "- For DESTRUCTIVE labels (delete, remove, sign out, cancel, disconnect, reset) — repeat the exact button text and require an unmistakable yes.",
+        "- After click_element or fill_field, briefly describe what changed using the returned screen snapshot.",
+        "- If the user asks you to do something on a different page, navigate_to that page first, then list_actions, then act.",
         "- Be brief and conversational.",
         "",
         `## Current context`,
