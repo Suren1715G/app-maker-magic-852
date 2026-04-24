@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { referrals as mockReferrals } from "@/data/mock";
 import { Copy, Link2, Send, Sparkles, Share2, Check } from "lucide-react";
@@ -21,6 +21,44 @@ function priceFor(count: number) {
   const tier = [...TIERS].reverse().find((t) => count >= t.count);
   const off = tier ? tier.off : 0;
   return { off, price: Math.max(0, BASE_PRICE - off) };
+}
+
+/**
+ * Animates a number from its previous value to `target` by ticking
+ * one integer step at a time on a requestAnimationFrame loop.
+ * Total duration is bounded so big jumps still finish quickly.
+ */
+function useCountUp(target: number, totalMs = 450) {
+  const [value, setValue] = useState(target);
+  const fromRef = useRef(target);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    const from = fromRef.current;
+    const to = target;
+    if (from === to) return;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / totalMs);
+      // ease-out for a quick "settle" feel
+      const eased = 1 - Math.pow(1 - t, 3);
+      const next = Math.round(from + (to - from) * eased);
+      setValue(next);
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        fromRef.current = to;
+        rafRef.current = null;
+      }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [target, totalMs]);
+
+  return value;
 }
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
@@ -69,6 +107,8 @@ const Referrals = () => {
 
   const [picked, setPicked] = useState(Math.max(1, earned));
   const { off: pickedOff, price: pickedPrice } = priceFor(picked);
+  const animatedPrice = useCountUp(pickedPrice, 500);
+  const animatedSavings = useCountUp(pickedOff, 500);
   const isMax = picked >= 4;
   const currentDiscount = priceFor(earned).off;
   const currentBill = priceFor(earned).price;
@@ -229,13 +269,12 @@ const Referrals = () => {
               <div className="flex items-baseline justify-center gap-3">
                 <span className="text-lg md:text-xl text-muted-foreground line-through">${BASE_PRICE}</span>
                 <span
-                  key={pickedPrice}
                   className={cn(
-                    "font-display text-6xl md:text-8xl font-bold animate-scale-in",
+                    "font-display text-6xl md:text-8xl font-bold tabular-nums",
                     isMax && "prism-text"
                   )}
                 >
-                  ${pickedPrice}
+                  ${animatedPrice}
                 </span>
               </div>
 
@@ -252,8 +291,8 @@ const Referrals = () => {
                   </div>
                 </div>
               ) : pickedOff > 0 ? (
-                <div className="mt-4 text-sm md:text-base text-accent font-medium">
-                  You save ${pickedOff} this month
+                <div className="mt-4 text-sm md:text-base text-accent font-medium tabular-nums">
+                  You save ${animatedSavings} this month
                 </div>
               ) : (
                 <div className="mt-4 text-sm text-muted-foreground">
