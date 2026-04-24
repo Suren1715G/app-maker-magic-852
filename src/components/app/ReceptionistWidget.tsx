@@ -84,7 +84,7 @@ export function ReceptionistWidget() {
   const conversation = useConversation({
     onConnect: () => {
       setCallError(null);
-      toast.success("Connected to your AI receptionist");
+      toast.success("Connected to Jarvis");
     },
     onDisconnect: (details?: DisconnectionDetails) => {
       setElapsed(0);
