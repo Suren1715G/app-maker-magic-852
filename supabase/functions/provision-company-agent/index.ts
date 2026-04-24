@@ -83,12 +83,68 @@ function buildAssistantTool(supabaseUrl: string, secret: string, companyId: stri
   };
 }
 
+function buildActionTool(supabaseUrl: string, secret: string, companyId: string) {
+  return {
+    type: "webhook",
+    name: "perform_action",
+    description:
+      "Perform an action on THIS company's account: tag a call, send an SMS, create a note/reminder, request a new phone number, or request a new location. ALWAYS call this with confirmed=false FIRST to get a preview, repeat the preview to the user, get verbal yes, then call AGAIN with confirmed=true. Never call with confirmed=true on the first try.",
+    api_schema: {
+      url: `${supabaseUrl}/functions/v1/assistant-action`,
+      method: "POST",
+      request_headers: [
+        { type: "value", name: "x-assistant-secret", value: secret },
+        { type: "value", name: "Content-Type", value: "application/json" },
+      ],
+      request_body_schema: {
+        type: "object",
+        required: ["action"],
+        properties: {
+          action: {
+            type: "string",
+            enum: [
+              "tag_call",
+              "send_sms",
+              "create_note",
+              "create_phone_request",
+              "create_location_request",
+            ],
+            description:
+              "Which action to perform. tag_call (needs call_id, tag); send_sms (needs to, message); create_note (needs title; optional body, due_at ISO datetime); create_phone_request (needs label); create_location_request (needs location_name; optional locations_wanted, note).",
+          },
+          confirmed: {
+            type: "boolean",
+            description:
+              "MUST be false on the first call (returns a preview). After the user verbally confirms, call AGAIN with confirmed=true.",
+          },
+          call_id: { type: "string", description: "For tag_call." },
+          tag: { type: "string", description: "For tag_call (e.g. 'lead', 'booking', 'spam')." },
+          to: { type: "string", description: "For send_sms — destination phone." },
+          message: { type: "string", description: "For send_sms — message text." },
+          title: { type: "string", description: "For create_note." },
+          body: { type: "string", description: "For create_note — optional details." },
+          due_at: { type: "string", description: "For create_note — optional ISO datetime for reminder." },
+          label: { type: "string", description: "For create_phone_request — what the number is for." },
+          location_name: { type: "string", description: "For create_location_request." },
+          locations_wanted: { type: "number", description: "For create_location_request — default 1." },
+          note: { type: "string", description: "For create_location_request — optional context." },
+          company_id: {
+            type: "string",
+            description: "Always pass this exact value, never change it.",
+            constant_value: companyId,
+          },
+        },
+      },
+    },
+  };
+}
+
 function injectCompanyContext(
   baseSystemPrompt: string | undefined,
   companyName: string,
   companyId: string,
 ) {
-  const block = `\n\n---\nYou are the AI receptionist and assistant for "${companyName}". You have a tool called "lookup_business_data" that queries this company's live dashboard data. When the user asks about their calls, leads, customers, missed calls, recent activity, phone numbers, or any business information — use that tool. Do NOT make up numbers. Always pass company_id="${companyId}" exactly as-is.\n---\n`;
+  const block = `\n\n---\nYou are the AI receptionist and assistant for "${companyName}".\n\nYou have two tools:\n1. lookup_business_data — read-only queries about this company's calls, leads, business info. Use freely.\n2. perform_action — make changes (tag a call, send SMS, create note/reminder, request phone/location). ALWAYS use confirm-first flow: call with confirmed=false to get a preview, read the preview to the user, get verbal "yes", then call again with confirmed=true. Never skip the confirmation.\n\nWhen the user asks about their calls, leads, customers, missed calls, recent activity, phone numbers, or any business information — use lookup_business_data. Do NOT make up numbers.\n\nWhen the user asks you to do something (send a text, tag a call, remind me, add a location, request a number) — use perform_action with confirmed=false first.\n\nAlways pass company_id="${companyId}" exactly as-is to both tools.\n---\n`;
   return (baseSystemPrompt ?? "") + block;
 }
 
@@ -132,6 +188,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const lookupTool = buildAssistantTool(SUPABASE_URL, ASSISTANT_TOOL_SECRET, company_id);
+    const actionTool = buildActionTool(SUPABASE_URL, ASSISTANT_TOOL_SECRET, company_id);
 
     if (existing?.agent_id) {
       // Fetch current config, ensure lookup tool + company context block are present.
@@ -149,13 +206,16 @@ Deno.serve(async (req) => {
       const curPrompt = cur?.conversation_config?.agent?.prompt ?? {};
       const curTools = Array.isArray(curPrompt?.tools) ? curPrompt.tools : [];
       const filteredTools = curTools.filter(
-        (t: any) => t?.name !== "lookup_business_data",
+        (t: any) =>
+          t?.name !== "lookup_business_data" && t?.name !== "perform_action",
       );
       const promptText: string = curPrompt?.prompt ?? "";
-      const marker = `company_id="${company_id}"`;
-      const newPromptText = promptText.includes(marker)
-        ? promptText
-        : injectCompanyContext(promptText, company.name, company_id);
+      // Strip any prior injected block so we always re-inject the latest version
+      const stripped = promptText.replace(
+        /\n\n---\nYou are the AI receptionist[\s\S]*?---\n/,
+        "",
+      );
+      const newPromptText = injectCompanyContext(stripped, company.name, company_id);
 
       const patchResp = await fetch(
         `https://api.elevenlabs.io/v1/convai/agents/${existing.agent_id}`,
@@ -170,7 +230,7 @@ Deno.serve(async (req) => {
               agent: {
                 prompt: {
                   prompt: newPromptText,
-                  tools: [...filteredTools, lookupTool],
+                  tools: [...filteredTools, lookupTool, actionTool],
                 },
               },
             },
@@ -205,6 +265,7 @@ Deno.serve(async (req) => {
             tools: [
               ...(Array.isArray(basePrompt?.tools) ? basePrompt.tools : []),
               lookupTool,
+              actionTool,
             ],
           },
         },

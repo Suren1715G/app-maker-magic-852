@@ -270,6 +270,50 @@ export type Database = {
           },
         ]
       }
+      notes: {
+        Row: {
+          body: string | null
+          company_id: string
+          created_at: string
+          created_by: string
+          done: boolean
+          due_at: string | null
+          id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          company_id: string
+          created_at?: string
+          created_by: string
+          done?: boolean
+          due_at?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          done?: boolean
+          due_at?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           business_name: string | null
