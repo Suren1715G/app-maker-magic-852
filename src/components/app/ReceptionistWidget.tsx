@@ -186,6 +186,95 @@ export function ReceptionistWidget() {
     });
   });
 
+  // Tool: click any visible button/link/tab/switch by its visible label.
+  // Confirmation flow: AI calls confirmed=false first → we return what WOULD happen.
+  // After verbal user "yes", AI calls again with confirmed=true to actually click.
+  useConversationClientTool(
+    "click_element",
+    async (params: { label?: string; confirmed?: boolean | string }) => {
+      const label = (params?.label ?? "").trim();
+      const confirmed = params?.confirmed === true || params?.confirmed === "true";
+      if (!label) return "Error: label is required.";
+
+      // Preview pass — find target without clicking.
+      if (!confirmed) {
+        const probe = clickByLabel(label, { allowDestructive: true });
+        if (!probe.ok) {
+          return `Could not find "${label}". ${probe.reason}${
+            probe.candidates?.length
+              ? ` Visible buttons include: ${probe.candidates.slice(0, 10).join(", ")}.`
+              : ""
+          } Ask the user to clarify.`;
+        }
+        // Don't actually click — undo by stopping here. We just return preview.
+        return `PREVIEW (not yet clicked): I will click "${probe.matched}".${
+          probe.destructive
+            ? " This looks DESTRUCTIVE — repeat it back to the user and require an explicit yes before calling again with confirmed=true."
+            : " Confirm with the user, then call again with confirmed=true."
+        }`;
+      }
+
+      const result = clickByLabel(label, { allowDestructive: true });
+      if (!result.ok) {
+        return `Click failed: ${result.reason}${
+          result.candidates?.length
+            ? ` Visible buttons: ${result.candidates.slice(0, 10).join(", ")}.`
+            : ""
+        }`;
+      }
+      const snap = await captureVisibleScreenAfterDelay(900, 6000);
+      return [
+        `Clicked "${result.matched}".`,
+        "Updated screen below — describe to the user only what's actually here.",
+        "----- BEGIN VISIBLE SCREEN -----",
+        snap.content || "(empty)",
+        "----- END VISIBLE SCREEN -----",
+      ].join("\n");
+    },
+  );
+
+  // Tool: type into a field by its label/placeholder.
+  useConversationClientTool(
+    "fill_field",
+    async (params: { label?: string; value?: string; confirmed?: boolean | string }) => {
+      const label = (params?.label ?? "").trim();
+      const value = String(params?.value ?? "");
+      const confirmed = params?.confirmed === true || params?.confirmed === "true";
+      if (!label) return "Error: label is required.";
+      if (value === "") return "Error: value is required.";
+
+      if (!confirmed) {
+        const controls = listVisibleControls();
+        const matchHint = controls.fields.find((f) =>
+          f.toLowerCase().includes(label.toLowerCase()),
+        );
+        return `PREVIEW (not yet typed): I will set "${label}"${
+          matchHint ? ` (matched field: "${matchHint}")` : ""
+        } to "${value}". Confirm with the user, then call again with confirmed=true.`;
+      }
+
+      const result = fillFieldByLabel(label, value);
+      if (!result.ok) {
+        return `Fill failed: ${result.reason}${
+          result.candidates?.length
+            ? ` Visible fields: ${result.candidates.slice(0, 10).join(", ")}.`
+            : ""
+        }`;
+      }
+      return `Filled "${result.matchedLabel}" with "${value}". Remind the user to click Save/Submit if needed.`;
+    },
+  );
+
+  // Tool: list everything Jarvis can act on right now (buttons + fields).
+  useConversationClientTool("list_actions", async () => {
+    const c = listVisibleControls();
+    return JSON.stringify({
+      clickable_elements: c.clickable,
+      input_fields: c.fields,
+      hint: "To click, call click_element({label, confirmed:false}) then with confirmed:true. To type, call fill_field({label, value, confirmed:false}) then confirmed:true.",
+    });
+  });
+
   const status = conversation.status;
   const isConnected = status === "connected";
   const isSpeaking = conversation.isSpeaking;
