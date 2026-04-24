@@ -37,6 +37,35 @@ async function waitForEnabledElement(selector: string, timeoutMs = 5000) {
   return null;
 }
 
+// Visibly highlight an element so the user can see Jarvis interacting with it.
+async function highlightAndPress(el: HTMLElement, holdMs = 700) {
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+  await wait(450);
+  const prev = {
+    outline: el.style.outline,
+    outlineOffset: el.style.outlineOffset,
+    boxShadow: el.style.boxShadow,
+    transition: el.style.transition,
+    transform: el.style.transform,
+  };
+  el.style.transition = "transform 150ms ease, box-shadow 150ms ease, outline-color 150ms ease";
+  el.style.outline = "3px solid hsl(var(--primary))";
+  el.style.outlineOffset = "3px";
+  el.style.boxShadow = "0 0 0 6px hsl(var(--primary) / 0.25), 0 12px 32px hsl(var(--primary) / 0.35)";
+  await wait(holdMs);
+  // Press effect
+  el.style.transform = "scale(0.96)";
+  await wait(160);
+  el.click();
+  el.style.transform = "scale(1)";
+  await wait(260);
+  el.style.outline = prev.outline;
+  el.style.outlineOffset = prev.outlineOffset;
+  el.style.boxShadow = prev.boxShadow;
+  el.style.transition = prev.transition;
+  el.style.transform = prev.transform;
+}
+
 function isQuotaMessage(message?: string | null) {
   return /quota|credits? remaining|payment required|insufficient credits/i.test(message ?? "");
 }
@@ -213,7 +242,7 @@ export function ReceptionistWidget() {
 
       // Preview pass — find target without clicking.
       if (!confirmed) {
-        const probe = clickByLabel(label, { allowDestructive: true, dryRun: true });
+        const probe = await clickByLabel(label, { allowDestructive: true, dryRun: true });
         if (!probe.ok) {
           return `Could not find "${label}". ${probe.reason}${
             probe.candidates?.length
@@ -229,7 +258,7 @@ export function ReceptionistWidget() {
         }`;
       }
 
-      const result = clickByLabel(label, { allowDestructive: true });
+      const result = await clickByLabel(label, { allowDestructive: true });
       if (!result.ok) {
         return `Click failed: ${result.reason}${
           result.candidates?.length
@@ -307,10 +336,9 @@ export function ReceptionistWidget() {
 
       const requestButton = await waitForEnabledElement('[data-jarvis-action="request-location"]', 6000);
       if (requestButton) {
-        requestButton.scrollIntoView({ block: "center", behavior: "smooth" });
-        requestButton.click();
+        await highlightAndPress(requestButton, 850);
       } else {
-        const result = clickByLabel("Request a new location", { allowDestructive: true });
+        const result = await clickByLabel("Request a new location", { allowDestructive: true });
         if (!result.ok) {
           const controls = listVisibleControls();
           return `Could not open the location request form: ${result.reason ?? "button not found"}. Visible buttons: ${controls.clickable.slice(0, 12).join(", ")}. Do not claim it opened; ask the user to wait for Settings to finish loading and try again.`;
