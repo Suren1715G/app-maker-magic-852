@@ -38,9 +38,13 @@ const CLICKABLE_SELECTOR =
 
 const DESTRUCTIVE = /\b(delete|remove|cancel subscription|sign out|log out|disconnect|unsubscribe|destroy|drop|wipe|reset|revoke)\b/i;
 
-export type ClickResult =
-  | { ok: true; matched: string; destructive: boolean }
-  | { ok: false; reason: string; candidates?: string[] };
+export type ClickResult = {
+  ok: boolean;
+  matched?: string;
+  destructive?: boolean;
+  reason?: string;
+  candidates?: string[];
+};
 
 export function clickByLabel(label: string, opts?: { allowDestructive?: boolean }): ClickResult {
   if (!label || typeof document === "undefined") {
@@ -104,9 +108,12 @@ function findFieldLabel(el: Element): string {
   );
 }
 
-export type FillResult =
-  | { ok: true; matchedLabel: string }
-  | { ok: false; reason: string; candidates?: string[] };
+export type FillResult = {
+  ok: boolean;
+  matchedLabel?: string;
+  reason?: string;
+  candidates?: string[];
+};
 
 export function fillFieldByLabel(label: string, value: string): FillResult {
   if (!label || typeof document === "undefined") {
