@@ -458,7 +458,16 @@ const Settings = () => {
       </Section>
 
       <Section title="Appearance">
-        <Toggle label="Dark mode" hint="Easy on the eyes" checked={darkMode} onChange={setDarkMode} />
+        <Toggle
+          label="Dark mode"
+          hint="Easy on the eyes"
+          checked={darkMode}
+          onChange={(v) => {
+            setDarkMode(v);
+            setTheme(v ? "dark" : "light");
+            toast.success(v ? "Dark mode on" : "Light mode on");
+          }}
+        />
       </Section>
 
       <Section title="Notifications">
