@@ -1,11 +1,14 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Phone, CalendarDays, MessageSquare, Users,
-  Star, BarChart3, Bell, CreditCard, Gift, Bot, LifeBuoy, Settings, MoreHorizontal,
+  Star, BarChart3, Bell, CreditCard, Gift, Bot, LifeBuoy, Settings, MoreHorizontal, LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 const primary = [
   { to: "/", label: "Home", icon: LayoutDashboard },
@@ -29,7 +32,16 @@ const more = [
 export function BottomNav() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const moreActive = more.some((m) => location.pathname === m.to || location.pathname.startsWith(m.to + "/"));
+
+  const handleSignOut = async () => {
+    setOpen(false);
+    await signOut();
+    toast.success("Signed out.");
+    navigate("/auth", { replace: true });
+  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 glass-strong safe-bottom border-t border-border/60">
@@ -100,6 +112,21 @@ export function BottomNav() {
                   </li>
                 ))}
               </ul>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="mt-3 w-full rounded-2xl p-3 border border-border/60 bg-card hover:bg-destructive/10 hover:border-destructive/40 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="h-9 w-9 rounded-full bg-destructive/15 text-destructive flex items-center justify-center">
+                    <LogOut className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">Sign out</div>
+                    <div className="text-[10px] text-muted-foreground truncate">End your session</div>
+                  </div>
+                </div>
+              </button>
             </SheetContent>
           </Sheet>
         </li>
