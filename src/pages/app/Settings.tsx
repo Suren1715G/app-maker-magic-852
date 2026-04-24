@@ -315,7 +315,14 @@ const Settings = () => {
                   </div>
                 </div>
               </div>
-              <Button size="sm" className="w-full mt-3" onClick={() => setReqOpen(true)} disabled={!companyId}>
+              <Button
+                size="sm"
+                className="w-full mt-3"
+                onClick={() => setReqOpen(true)}
+                disabled={!companyId}
+                aria-label="Request a new location"
+                data-jarvis-action="request-location"
+              >
                 <CalendarPlus className="h-3.5 w-3.5" /> Request a new location
               </Button>
             </div>
@@ -384,6 +391,7 @@ const Settings = () => {
               <Input
                 value={reqLocName}
                 onChange={(e) => setReqLocName(e.target.value)}
+                aria-label="Location name"
                 placeholder="e.g. Downtown branch"
                 className="h-9"
                 maxLength={80}
@@ -398,6 +406,7 @@ const Settings = () => {
                 max={50}
                 value={reqCount}
                 onChange={(e) => setReqCount(Number(e.target.value) || 1)}
+                aria-label="How many new locations"
                 className="h-9"
               />
             </div>
@@ -408,6 +417,7 @@ const Settings = () => {
                 onChange={(e) => setReqNote(e.target.value)}
                 rows={3}
                 maxLength={500}
+                aria-label="Anything we should know"
                 placeholder="Service area, expected call volume, timing…"
                 className="w-full rounded-xl bg-input border border-border p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
