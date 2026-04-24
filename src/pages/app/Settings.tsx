@@ -668,14 +668,22 @@ const Field = ({ label, value, onChange }: { label: string; value: string; onCha
   </div>
 );
 
-const Toggle = ({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) => (
-  <div className="flex items-center justify-between px-4 py-3.5">
-    <div>
-      <div className="text-sm font-medium">{label}</div>
-      <div className="text-[11px] text-muted-foreground">{hint}</div>
-    </div>
-    <Switch checked={checked} onCheckedChange={onChange} />
-  </div>
-);
+const Toggle = ({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) => {
+  // Make the whole row clickable AND give the Switch a real aria-label so
+  // Jarvis (and screen readers) can find the switch by its visible text.
+  return (
+    <label className="flex items-center justify-between px-4 py-3.5 cursor-pointer select-none">
+      <div>
+        <div className="text-sm font-medium">{label}</div>
+        <div className="text-[11px] text-muted-foreground">{hint}</div>
+      </div>
+      <Switch
+        checked={checked}
+        onCheckedChange={onChange}
+        aria-label={label}
+      />
+    </label>
+  );
+};
 
 export default Settings;

@@ -20,7 +20,20 @@ function elementLabel(el: Element): string {
   const aria = el.getAttribute("aria-label");
   if (aria) return aria;
   const text = (el as HTMLElement).innerText || el.textContent || "";
-  return text;
+  if (text && text.trim()) return text;
+  // Fallback: walk up to a wrapping <label> (Radix Switch pattern). Capture
+  // its text but exclude the switch element's own (empty) text.
+  let p: Element | null = el.parentElement;
+  let depth = 0;
+  while (p && depth < 4) {
+    if (p.tagName === "LABEL") {
+      return (p as HTMLElement).innerText || p.textContent || "";
+    }
+    p = p.parentElement;
+    depth++;
+  }
+  // Fallback: title attribute
+  return el.getAttribute("title") || el.getAttribute("name") || "";
 }
 
 function score(needle: string, hay: string) {
