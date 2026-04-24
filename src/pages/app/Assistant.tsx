@@ -21,7 +21,7 @@ const suggestions = [
 
 const Assistant = () => {
   const [messages, setMessages] = useState<Msg[]>([
-    { role: "assistant", content: "At your service. I'm **Jarvis** — your AI analyst. Ask me anything about your calls, bookings, leads, or reviews." },
+    { role: "assistant", content: "Hi 👋 I'm your **AI Analyst**. Ask me anything about your calls, bookings, leads, or reviews." },
   ]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -120,10 +120,10 @@ const Assistant = () => {
             </span>
           </div>
           <h1 className="font-display text-5xl font-semibold leading-none">
-            <span className="prism-text">Jarvis</span>
+            <span className="prism-text">AI Analyst</span>
           </h1>
           <p className="text-xs text-muted-foreground mt-3 max-w-[280px]">
-            Your in-app intelligence layer. Always listening, always thinking.
+            Ask anything about your business — calls, bookings, leads, reviews.
           </p>
         </div>
       </header>
