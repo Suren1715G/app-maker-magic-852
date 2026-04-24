@@ -373,6 +373,89 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_messages: {
+        Row: {
+          body: string
+          company_id: string
+          created_at: string
+          delivered: boolean
+          direction: string
+          external_id: string | null
+          id: string
+          sent_at: string
+          thread_id: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          company_id: string
+          created_at?: string
+          delivered?: boolean
+          direction: string
+          external_id?: string | null
+          id?: string
+          sent_at?: string
+          thread_id: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          company_id?: string
+          created_at?: string
+          delivered?: boolean
+          direction?: string
+          external_id?: string | null
+          id?: string
+          sent_at?: string
+          thread_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "sms_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_threads: {
+        Row: {
+          company_id: string
+          created_at: string
+          customer: string | null
+          flagged: boolean
+          id: string
+          last_message_at: string
+          phone: string
+          unread: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          customer?: string | null
+          flagged?: boolean
+          id?: string
+          last_message_at?: string
+          phone: string
+          unread?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          customer?: string | null
+          flagged?: boolean
+          id?: string
+          last_message_at?: string
+          phone?: string
+          unread?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
