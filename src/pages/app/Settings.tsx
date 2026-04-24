@@ -12,15 +12,13 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 const VOICE_OPTIONS: { id: string; label: string }[] = [
-  { id: "9BWtsMINqrJLrRacOk9x", label: "Aria · Friendly female" },
-  { id: "EXAVITQu4vr4xnSDxMaL", label: "Sarah · Warm female" },
-  { id: "FGY2WhTYpPnrIDTdsKH5", label: "Laura · Upbeat female" },
-  { id: "JBFqnCBsd6RMkjVDRZzb", label: "George · Calm male" },
-  { id: "TX3LPaxmHKxFdv7VOQHJ", label: "Liam · Confident male" },
-  { id: "nPczCjzI2devNBz1zQrb", label: "Brian · Deep male" },
-  { id: "cgSgspJ2msm6clMCkdW9", label: "Jessica · Energetic female" },
-  { id: "iP95p4xoKVk53GoZ742B", label: "Chris · Casual male" },
+  { id: "wDsJlOXPqcvIUKdLXjDs", label: "Jarvis · British robotic monotone" },
+  { id: "UgBBYS2sOqTuMpoF3BR0", label: "Mark · Confident male" },
+  { id: "eXpIbVcVbLo8ZJQDlDnl", label: "Siren · Smooth female" },
+  { id: "l4Coq6695JDX9xtLqXDE", label: "Lauren · Friendly female" },
+  { id: "tnSpp4vdxKPjI9w0GnoV", label: "Hope · Warm female" },
 ];
+const DEFAULT_VOICE_ID = VOICE_OPTIONS[0].id;
 
 const Settings = () => {
   const { user, signOut } = useAuth();
@@ -30,11 +28,7 @@ const Settings = () => {
   const [alwaysOn, setAlwaysOn] = useState(true);
   const [openTime, setOpenTime] = useState("08:00");
   const [closeTime, setCloseTime] = useState("18:00");
-  const [greeting, setGreeting] = useState("Hi! You've reached SGS. How can I help today?");
-  const [aiPrompt, setAiPrompt] = useState(
-    "You are a friendly AI receptionist. Greet callers warmly, answer questions about our services, qualify leads, and offer to book an appointment. Keep replies under two sentences.",
-  );
-  const [aiVoiceId, setAiVoiceId] = useState<string>(VOICE_OPTIONS[0].id);
+  const [aiVoiceId, setAiVoiceId] = useState<string>(DEFAULT_VOICE_ID);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [savingAi, setSavingAi] = useState(false);
 
@@ -137,12 +131,14 @@ const Settings = () => {
       setCompanyId(profile.company_id);
       const { data: company } = await supabase
         .from("companies")
-        .select("ai_system_prompt, ai_first_message, ai_voice_id")
+        .select("ai_voice_id")
         .eq("id", profile.company_id)
         .maybeSingle();
-      if (company?.ai_system_prompt) setAiPrompt(company.ai_system_prompt);
-      if (company?.ai_first_message) setGreeting(company.ai_first_message);
-      if (company?.ai_voice_id) setAiVoiceId(company.ai_voice_id);
+      if (company?.ai_voice_id) {
+        // Only honor stored voice if it's still in our allowed list
+        const allowed = VOICE_OPTIONS.some((v) => v.id === company.ai_voice_id);
+        setAiVoiceId(allowed ? company.ai_voice_id : DEFAULT_VOICE_ID);
+      }
       await loadLocations(profile.company_id);
       await loadRequests(profile.company_id);
     })();
@@ -203,19 +199,18 @@ const Settings = () => {
       return;
     }
     setSavingAi(true);
-    const { error } = await supabase
-      .from("companies")
-      .update({
-        ai_system_prompt: aiPrompt,
-        ai_first_message: greeting,
-        ai_voice_id: aiVoiceId,
-      })
-      .eq("id", companyId);
+    const { data, error } = await supabase.functions.invoke("update-elevenlabs-agent", {
+      body: { voice_id: aiVoiceId },
+    });
     setSavingAi(false);
     if (error) {
-      toast.error("Failed to save AI settings");
+      toast.error(error.message ?? "Failed to update voice");
+      return;
+    }
+    if (data?.synced === false) {
+      toast.success(data?.message ?? "Voice saved");
     } else {
-      toast.success("AI receptionist updated");
+      toast.success("Voice updated — live on next call");
     }
   };
 
