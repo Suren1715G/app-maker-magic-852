@@ -88,7 +88,7 @@ function buildActionTool(supabaseUrl: string, secret: string, companyId: string)
     type: "webhook",
     name: "perform_action",
     description:
-      "Server-side fallback for actions WITHOUT an on-screen form: tag a call, send an SMS, or create a note/reminder. ALWAYS call with confirmed=false first to get a preview, repeat to the user, get verbal yes, then call again with confirmed=true. DO NOT use this for 'request a new location' or 'request a new phone number' — those have a real form on the Settings page; walk the user through it using navigate_to + click_element + fill_field instead. The create_phone_request and create_location_request actions remain available only as a last-resort fallback if the form is unreachable.",
+      "Server-side actions WITHOUT an on-screen form: tag a call, send an SMS, or create a note/reminder. ALWAYS call with confirmed=false first to get a preview, repeat to the user, get verbal yes, then call again with confirmed=true. NEVER use this for 'request a new location' or 'request a new phone number' — those MUST be done by walking the user through the on-screen form on /settings using navigate_to + click_element + fill_field.",
     api_schema: {
       url: `${supabaseUrl}/functions/v1/assistant-action`,
       method: "POST",
@@ -106,11 +106,9 @@ function buildActionTool(supabaseUrl: string, secret: string, companyId: string)
               "tag_call",
               "send_sms",
               "create_note",
-              "create_phone_request",
-              "create_location_request",
             ],
             description:
-              "Which action to perform. tag_call (needs call_id, tag); send_sms (needs to, message); create_note (needs title; optional body, due_at ISO datetime); create_phone_request (needs label); create_location_request (needs location_name; optional locations_wanted, note).",
+              "Which action to perform. tag_call (needs call_id, tag); send_sms (needs to, message); create_note (needs title; optional body, due_at ISO datetime). For requesting a new LOCATION or new PHONE NUMBER, do NOT use this tool — walk the user through the form on /settings using navigate_to + click_element + fill_field.",
           },
           confirmed: {
             type: "boolean",
