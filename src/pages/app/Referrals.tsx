@@ -269,13 +269,12 @@ const Referrals = () => {
               <div className="flex items-baseline justify-center gap-3">
                 <span className="text-lg md:text-xl text-muted-foreground line-through">${BASE_PRICE}</span>
                 <span
-                  key={pickedPrice}
                   className={cn(
-                    "font-display text-6xl md:text-8xl font-bold animate-scale-in",
+                    "font-display text-6xl md:text-8xl font-bold tabular-nums",
                     isMax && "prism-text"
                   )}
                 >
-                  ${pickedPrice}
+                  ${animatedPrice}
                 </span>
               </div>
 
@@ -292,8 +291,8 @@ const Referrals = () => {
                   </div>
                 </div>
               ) : pickedOff > 0 ? (
-                <div className="mt-4 text-sm md:text-base text-accent font-medium">
-                  You save ${pickedOff} this month
+                <div className="mt-4 text-sm md:text-base text-accent font-medium tabular-nums">
+                  You save ${animatedSavings} this month
                 </div>
               ) : (
                 <div className="mt-4 text-sm text-muted-foreground">
