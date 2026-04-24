@@ -275,6 +275,38 @@ export function ReceptionistWidget() {
     });
   });
 
+  // Purpose-built tool for the request-location flow. This removes ambiguity:
+  // Jarvis must visibly open the Settings page and press the real button before
+  // collecting form fields from the user.
+  useConversationClientTool(
+    "open_location_request_form",
+    async (params: { confirmed?: boolean | string }) => {
+      const confirmed = params?.confirmed === true || params?.confirmed === "true";
+      if (!confirmed) {
+        return 'PREVIEW (not yet opened): I will open Settings and click the visible "Request a new location" button so you can watch the form appear. Confirm with the user, then call again with confirmed=true.';
+      }
+
+      navigate("/settings");
+      toast.success("Opening location request form");
+      await new Promise((resolve) => window.setTimeout(resolve, 1200));
+
+      const result = clickByLabel("Request a new location", { allowDestructive: true });
+      if (!result.ok) {
+        const controls = listVisibleControls();
+        return `Could not open the location request form: ${result.reason ?? "button not found"}. Visible buttons: ${controls.clickable.slice(0, 12).join(", ")}. Do not claim it opened; ask the user to scroll to Settings or try again.`;
+      }
+
+      const snap = await captureVisibleScreenAfterDelay(700, 6000);
+      return [
+        'Opened the real "Request a new location" form on screen.',
+        "Next: ask the user for the location name and spelling, number of locations, and any note. Then fill the visible fields one by one with fill_field confirm-first.",
+        "----- BEGIN VISIBLE SCREEN -----",
+        snap.content || "(empty)",
+        "----- END VISIBLE SCREEN -----",
+      ].join("\n");
+    },
+  );
+
   const status = conversation.status;
   const isConnected = status === "connected";
   const isSpeaking = conversation.isSpeaking;
