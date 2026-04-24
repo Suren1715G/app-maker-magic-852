@@ -98,6 +98,17 @@ const Settings = () => {
     toast.success("Invite sent (demo)");
   };
 
+  // Keep the dark-mode switch in sync if the theme is changed elsewhere
+  // (e.g. Jarvis flips it via the on-screen toggle).
+  useEffect(() => {
+    const onChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ mode: "dark" | "light" }>).detail;
+      setDarkMode(detail?.mode !== "light");
+    };
+    window.addEventListener("themechange", onChange as EventListener);
+    return () => window.removeEventListener("themechange", onChange as EventListener);
+  }, []);
+
   const onLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
