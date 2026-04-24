@@ -84,7 +84,7 @@ export function ReceptionistWidget() {
   const conversation = useConversation({
     onConnect: () => {
       setCallError(null);
-      toast.success("Connected to your AI receptionist");
+      toast.success("Connected to Jarvis");
     },
     onDisconnect: (details?: DisconnectionDetails) => {
       setElapsed(0);
@@ -295,7 +295,7 @@ export function ReceptionistWidget() {
       {/* Floating launcher */}
       <button
         onClick={() => setOpen((o) => !o)}
-        aria-label="Open AI receptionist"
+        aria-label="Open Jarvis"
         className={cn(
           "fixed bottom-24 right-4 z-40 h-12 w-12 rounded-full shadow-lg",
           "bg-gradient-to-br from-primary to-accent text-primary-foreground",
@@ -333,24 +333,43 @@ export function ReceptionistWidget() {
             >
               {/* Header */}
               {!isConnected && (
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-border/60">
-                  <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center">
+                <div className="relative flex items-center gap-2.5 px-4 py-3 border-b border-primary/15 overflow-hidden">
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 opacity-60"
+                    style={{
+                      background:
+                        "radial-gradient(ellipse 80% 100% at 0% 50%, hsl(var(--primary) / 0.18) 0%, transparent 70%)",
+                    }}
+                  />
+                  <span className="relative h-9 w-9 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground flex items-center justify-center shadow-[0_0_16px_-2px_hsl(var(--primary)/0.7)]">
                     <Sparkles className="h-4 w-4" />
                   </span>
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold leading-tight">AI Receptionist</div>
-                    <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+                  <div className="relative flex-1 min-w-0">
+                    <div className="font-display text-base font-semibold leading-none">
+                      <span className="prism-text">Jarvis</span>
+                    </div>
+                    <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground flex items-center gap-1.5 mt-1">
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          quotaExceeded
+                            ? "bg-destructive"
+                            : connecting
+                              ? "bg-accent animate-pulse"
+                              : "bg-success animate-pulse",
+                        )}
+                      />
                       {quotaExceeded
                         ? "Voice unavailable"
                         : connecting
                           ? "Connecting…"
-                          : "Tap call to start"}
+                          : "Standing by"}
                     </div>
                   </div>
                   <button
                     onClick={() => setOpen(false)}
-                    className="text-muted-foreground hover:text-foreground"
+                    className="relative text-muted-foreground hover:text-foreground"
                     aria-label="Close"
                   >
                     <X className="h-4 w-4" />
@@ -386,7 +405,7 @@ export function ReceptionistWidget() {
                     </div>
                   ) : (
                     <div className="text-xs text-muted-foreground max-w-[240px] px-3">
-                      Hands-free call. Just speak — your AI receptionist will answer back.
+                      Hands-free call. Just speak — Jarvis will answer back.
                     </div>
                   )}
                 </div>
@@ -403,7 +422,12 @@ export function ReceptionistWidget() {
                   <button
                     onClick={startCall}
                     disabled={connecting || quotaExceeded}
-                    className="h-14 px-6 rounded-full bg-success text-success-foreground font-semibold text-sm flex items-center gap-2 shadow-lg hover:scale-105 transition-transform disabled:opacity-60"
+                    className={cn(
+                      "h-14 px-6 rounded-full font-semibold text-sm flex items-center gap-2 transition-transform hover:scale-105 disabled:opacity-60 disabled:hover:scale-100",
+                      quotaExceeded
+                        ? "bg-card border border-border text-muted-foreground"
+                        : "bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-[0_8px_28px_-6px_hsl(var(--primary)/0.7)]",
+                    )}
                   >
                     {quotaExceeded ? (
                       <>
