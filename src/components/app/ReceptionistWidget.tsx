@@ -22,6 +22,21 @@ type VoiceTokenResponse = {
   retryable?: boolean;
 };
 
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function waitForEnabledElement(selector: string, timeoutMs = 5000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const el = document.querySelector(selector) as HTMLElement | null;
+    const disabled = el?.matches("[disabled], [aria-disabled='true']") || (el as HTMLButtonElement | null)?.disabled;
+    if (el && !disabled) return el;
+    await wait(150);
+  }
+  return null;
+}
+
 function isQuotaMessage(message?: string | null) {
   return /quota|credits? remaining|payment required|insufficient credits/i.test(message ?? "");
 }
@@ -288,12 +303,24 @@ export function ReceptionistWidget() {
 
       navigate("/settings");
       toast.success("Opening location request form");
-      await new Promise((resolve) => window.setTimeout(resolve, 1200));
+      await wait(900);
 
-      const result = clickByLabel("Request a new location", { allowDestructive: true });
-      if (!result.ok) {
+      const requestButton = await waitForEnabledElement('[data-jarvis-action="request-location"]', 6000);
+      if (requestButton) {
+        requestButton.scrollIntoView({ block: "center", behavior: "smooth" });
+        requestButton.click();
+      } else {
+        const result = clickByLabel("Request a new location", { allowDestructive: true });
+        if (!result.ok) {
+          const controls = listVisibleControls();
+          return `Could not open the location request form: ${result.reason ?? "button not found"}. Visible buttons: ${controls.clickable.slice(0, 12).join(", ")}. Do not claim it opened; ask the user to wait for Settings to finish loading and try again.`;
+        }
+      }
+
+      const formField = await waitForEnabledElement('input[aria-label="Location name"]', 3000);
+      if (!formField) {
         const controls = listVisibleControls();
-        return `Could not open the location request form: ${result.reason ?? "button not found"}. Visible buttons: ${controls.clickable.slice(0, 12).join(", ")}. Do not claim it opened; ask the user to scroll to Settings or try again.`;
+        return `Click did not open the location request form. Visible buttons: ${controls.clickable.slice(0, 12).join(", ")}. Do not claim it opened; ask the user to try again after Settings finishes loading.`;
       }
 
       const snap = await captureVisibleScreenAfterDelay(700, 6000);
