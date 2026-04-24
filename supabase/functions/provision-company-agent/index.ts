@@ -38,10 +38,10 @@ function buildAssistantTool(supabaseUrl: string, secret: string, companyId: stri
     api_schema: {
       url: `${supabaseUrl}/functions/v1/assistant-lookup`,
       method: "POST",
-      request_headers: [
-        { type: "value", name: "x-assistant-secret", value: secret },
-        { type: "value", name: "Content-Type", value: "application/json" },
-      ],
+      request_headers: {
+        "x-assistant-secret": secret,
+        "Content-Type": "application/json",
+      },
       request_body_schema: {
         type: "object",
         required: ["action"],
@@ -92,10 +92,10 @@ function buildActionTool(supabaseUrl: string, secret: string, companyId: string)
     api_schema: {
       url: `${supabaseUrl}/functions/v1/assistant-action`,
       method: "POST",
-      request_headers: [
-        { type: "value", name: "x-assistant-secret", value: secret },
-        { type: "value", name: "Content-Type", value: "application/json" },
-      ],
+      request_headers: {
+        "x-assistant-secret": secret,
+        "Content-Type": "application/json",
+      },
       request_body_schema: {
         type: "object",
         required: ["action"],
