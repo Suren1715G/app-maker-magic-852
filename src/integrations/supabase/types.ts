@@ -226,6 +226,50 @@ export type Database = {
           },
         ]
       }
+      location_requests: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          location_name: string
+          locations_wanted: number
+          note: string | null
+          requested_by: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          location_name: string
+          locations_wanted?: number
+          note?: string | null
+          requested_by: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          location_name?: string
+          locations_wanted?: number
+          note?: string | null
+          requested_by?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           business_name: string | null
