@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { getStoredTheme, setTheme } from "@/lib/theme";
 
 const VOICE_OPTIONS: { id: string; label: string }[] = [
   { id: "wDsJlOXPqcvIUKdLXjDs", label: "Jarvis · British robotic monotone" },
@@ -63,7 +64,7 @@ const Settings = () => {
 
   const [services, setServices] = useState(["Deep Clean", "Move-out Clean", "Office Clean", "Standard Clean"]);
   const [newSvc, setNewSvc] = useState("");
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => getStoredTheme() === "dark");
   const [logo, setLogo] = useState<string | null>(null);
 
   // Notifications
@@ -96,6 +97,17 @@ const Settings = () => {
     setTeamEmail("");
     toast.success("Invite sent (demo)");
   };
+
+  // Keep the dark-mode switch in sync if the theme is changed elsewhere
+  // (e.g. Jarvis flips it via the on-screen toggle).
+  useEffect(() => {
+    const onChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ mode: "dark" | "light" }>).detail;
+      setDarkMode(detail?.mode !== "light");
+    };
+    window.addEventListener("themechange", onChange as EventListener);
+    return () => window.removeEventListener("themechange", onChange as EventListener);
+  }, []);
 
   const onLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -457,7 +469,16 @@ const Settings = () => {
       </Section>
 
       <Section title="Appearance">
-        <Toggle label="Dark mode" hint="Easy on the eyes" checked={darkMode} onChange={setDarkMode} />
+        <Toggle
+          label="Dark mode"
+          hint="Easy on the eyes"
+          checked={darkMode}
+          onChange={(v) => {
+            setDarkMode(v);
+            setTheme(v ? "dark" : "light");
+            toast.success(v ? "Dark mode on" : "Light mode on");
+          }}
+        />
       </Section>
 
       <Section title="Notifications">
