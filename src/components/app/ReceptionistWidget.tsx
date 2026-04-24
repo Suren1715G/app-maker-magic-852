@@ -189,6 +189,39 @@ export function ReceptionistWidget() {
   const isConnected = status === "connected";
   const isSpeaking = conversation.isSpeaking;
 
+  // Live audio amplitude (0..1) sampled every frame and read by JarvisNetwork.
+  const levelRef = useRef({ current: 0 });
+
+  useEffect(() => {
+    if (!isConnected) {
+      levelRef.current.current = 0;
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      try {
+        // Prefer agent output when speaking, else mic input.
+        const data = isSpeaking
+          ? conversation.getOutputByteFrequencyData?.()
+          : conversation.getInputByteFrequencyData?.();
+        if (data && data.length) {
+          // Use lower frequency bins (voice energy) — more responsive than RMS over all bins.
+          const bins = Math.min(32, data.length);
+          let sum = 0;
+          for (let i = 0; i < bins; i++) sum += data[i];
+          const avg = sum / bins / 255; // 0..1
+          // Boost — most speech sits in the lower end of the range.
+          levelRef.current.current = Math.min(1, avg * 1.8);
+        }
+      } catch {
+        /* ignore */
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isConnected, isSpeaking, conversation]);
+
   // Call timer
   useEffect(() => {
     if (!isConnected) return;
