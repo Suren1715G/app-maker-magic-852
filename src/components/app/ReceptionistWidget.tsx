@@ -358,7 +358,7 @@ export function ReceptionistWidget() {
             >
               {/* Hero — 3D Jarvis network (always shown) */}
               <div className="relative h-[200px] overflow-hidden">
-                <JarvisNetwork />
+                <JarvisNetwork levelRef={levelRef.current} />
                 {/* Vignette so the network fades into the panel */}
                 <div
                   aria-hidden
