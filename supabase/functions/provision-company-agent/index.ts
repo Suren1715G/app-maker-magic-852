@@ -49,6 +49,7 @@ function buildAssistantTool(supabaseUrl: string, secret: string, companyId: stri
           action: {
             type: "string",
             enum: [
+              "data_index",
               "business_info",
               "call_stats",
               "recent_calls",
@@ -56,7 +57,7 @@ function buildAssistantTool(supabaseUrl: string, secret: string, companyId: stri
               "leads_summary",
             ],
             description:
-              "Which lookup to perform. business_info = company name + phone numbers; call_stats = counts for a period; recent_calls = latest N calls; search_calls = find by name/phone; leads_summary = leads/bookings.",
+              "Which lookup to perform. data_index = list ALL data sources available + which topics are NOT yet connected (call this FIRST when unsure whether a topic is queryable, e.g. messages, reviews, appointments); business_info = company name + phone numbers; call_stats = counts for a period; recent_calls = latest N calls; search_calls = find by name/phone; leads_summary = leads/bookings.",
           },
           period: {
             type: "string",
