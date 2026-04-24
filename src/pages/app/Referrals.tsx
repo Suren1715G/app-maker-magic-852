@@ -80,11 +80,30 @@ const Referrals = () => {
   const referrals = isNew ? [] : mockReferrals;
   const earned = referrals.filter((r) => r.status === "joined").length;
 
-  const refCode = useMemo(() => {
-    const seed = user?.id?.replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase() || "SGSDEMO1";
-    return seed;
+  // Each user has a unique referral code stored in the database.
+  const [refCode, setRefCode] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id) {
+      setRefCode(null);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("referral_codes")
+        .select("code")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!cancelled) setRefCode(data?.code ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id]);
-  const link = `${window.location.origin}/auth?mode=signup&ref=${refCode}`;
+
+  const link = refCode
+    ? `${window.location.origin}/auth?mode=signup&ref=${refCode}`
+    : `${window.location.origin}/auth?mode=signup`;
   const message = `Hey, I use this AI receptionist that answers all my calls and books appointments automatically. Costs $250/month and pays for itself easily. Check it out: ${link}`;
 
   const [copied, setCopied] = useState<"link" | "msg" | null>(null);
