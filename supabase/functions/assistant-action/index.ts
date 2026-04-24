@@ -169,48 +169,13 @@ Deno.serve(async (req) => {
         return json({ ok: true, message: "Note saved." });
       }
 
-      case "create_phone_request": {
-        const label = String(body?.label ?? "").trim();
-        if (!label) return json({ error: "label is required" }, 400);
-        if (!actor_user_id) return json({ error: "No company member found" }, 400);
-        if (!confirmed) {
-          return json({
-            preview: `Request a new phone number with label "${label}".`,
-            requires_confirmation: true,
-          });
-        }
-        const { error } = await admin.from("company_phone_numbers").insert({
-          company_id,
-          phone_number: "PENDING",
-          label,
-          status: "pending",
-          requested_by: actor_user_id,
-        });
-        if (error) return json({ error: error.message }, 500);
-        return json({ ok: true, message: "Phone number request submitted." });
-      }
-
+      case "create_phone_request":
       case "create_location_request": {
-        const location_name = String(body?.location_name ?? "").trim();
-        const locations_wanted = Math.max(1, Number(body?.locations_wanted ?? 1));
-        const note = body?.note ? String(body.note) : null;
-        if (!location_name) return json({ error: "location_name is required" }, 400);
-        if (!actor_user_id) return json({ error: "No company member found" }, 400);
-        if (!confirmed) {
-          return json({
-            preview: `Request new location "${location_name}" (${locations_wanted})${note ? ` — ${note}` : ""}.`,
-            requires_confirmation: true,
-          });
-        }
-        const { error } = await admin.from("location_requests").insert({
-          company_id,
-          location_name,
-          locations_wanted,
-          note,
-          requested_by: actor_user_id,
-        });
-        if (error) return json({ error: error.message }, 500);
-        return json({ ok: true, message: "Location request submitted." });
+        return json({
+          ok: false,
+          error:
+            "This action no longer goes through the server. Walk the user through the on-screen form on the Settings page instead: navigate_to('settings'), then click_element('Request a new location') or the phone-request button, then fill_field each field with confirm-first, then click_element('Send request'). After it sends, ask if they want to click_element('Book a meeting') for Calendly.",
+        }, 400);
       }
 
       default:
