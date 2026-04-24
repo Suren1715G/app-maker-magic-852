@@ -224,7 +224,7 @@ export function ReceptionistWidget() {
       }
       const snap = await captureVisibleScreenAfterDelay(900, 6000);
       return [
-        `Clicked "${result.matched}".`,
+        `Clicked "${result.matched ?? label}".`,
         "Updated screen below — describe to the user only what's actually here.",
         "----- BEGIN VISIBLE SCREEN -----",
         snap.content || "(empty)",
@@ -261,7 +261,7 @@ export function ReceptionistWidget() {
             : ""
         }`;
       }
-      return `Filled "${result.matchedLabel}" with "${value}". Remind the user to click Save/Submit if needed.`;
+      return `Filled "${result.matchedLabel ?? label}" with "${value}". Remind the user to click Save/Submit if needed.`;
     },
   );
 
