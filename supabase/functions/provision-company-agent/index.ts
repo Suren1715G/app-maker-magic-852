@@ -88,7 +88,7 @@ function buildActionTool(supabaseUrl: string, secret: string, companyId: string)
     type: "webhook",
     name: "perform_action",
     description:
-      "Perform an action on THIS company's account: tag a call, send an SMS, create a note/reminder, request a new phone number, or request a new location. ALWAYS call this with confirmed=false FIRST to get a preview, repeat the preview to the user, get verbal yes, then call AGAIN with confirmed=true. Never call with confirmed=true on the first try.",
+      "Server-side fallback for actions WITHOUT an on-screen form: tag a call, send an SMS, or create a note/reminder. ALWAYS call with confirmed=false first to get a preview, repeat to the user, get verbal yes, then call again with confirmed=true. DO NOT use this for 'request a new location' or 'request a new phone number' — those have a real form on the Settings page; walk the user through it using navigate_to + click_element + fill_field instead. The create_phone_request and create_location_request actions remain available only as a last-resort fallback if the form is unreachable.",
     api_schema: {
       url: `${supabaseUrl}/functions/v1/assistant-action`,
       method: "POST",
