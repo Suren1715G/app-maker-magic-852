@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { threads as mockThreads, type SmsThread } from "@/data/mock";
 import { fmtRel } from "@/lib/format";
@@ -8,28 +8,128 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const Sms = () => {
   const isNew = useIsNewCustomer();
+  const { companyId } = useAuth();
   const [threads, setThreads] = useState<SmsThread[]>(isNew ? [] : mockThreads);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [loading, setLoading] = useState(isNew);
 
   const active = threads.find((t) => t.id === activeId);
 
-  const sendReply = () => {
+  const loadThreads = async () => {
+    if (!companyId || !isNew) {
+      setLoading(false);
+      return;
+    }
+    const db = supabase as any;
+    const { data, error } = await db
+      .from("sms_threads")
+      .select("id, customer, phone, unread, flagged, last_message_at, sms_messages(id, direction, body, sent_at)")
+      .eq("company_id", companyId)
+      .order("last_message_at", { ascending: false });
+
+    if (error) {
+      toast.error("Could not load messages");
+      setLoading(false);
+      return;
+    }
+
+    setThreads(
+      (data ?? []).map((t: any) => ({
+        id: t.id,
+        customer: t.customer || t.phone,
+        phone: t.phone,
+        unread: t.unread ?? 0,
+        flagged: Boolean(t.flagged),
+        messages: [...(t.sms_messages ?? [])]
+          .sort((a: any, b: any) => +new Date(a.sent_at) - +new Date(b.sent_at))
+          .map((m: any) => ({
+            id: m.id,
+            from: m.direction === "outbound" ? "ai" : "lead",
+            body: m.body,
+            at: m.sent_at,
+          })),
+      })),
+    );
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (!isNew) {
+      setThreads(mockThreads);
+      setLoading(false);
+      return;
+    }
+    loadThreads();
+
+    if (!companyId) return;
+    const channel = supabase
+      .channel(`sms:${companyId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "sms_threads", filter: `company_id=eq.${companyId}` }, loadThreads)
+      .on("postgres_changes", { event: "*", schema: "public", table: "sms_messages", filter: `company_id=eq.${companyId}` }, loadThreads)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [companyId, isNew]);
+
+  const sendReply = async () => {
     if (!active || !draft.trim()) return;
-    const newMsg = { id: crypto.randomUUID(), from: "ai" as const, body: draft, at: new Date().toISOString() };
+    const message = draft.trim();
+
+    if (isNew && companyId) {
+      const db = supabase as any;
+      const now = new Date().toISOString();
+      const { error: messageError } = await db.from("sms_messages").insert({
+        company_id: companyId,
+        thread_id: active.id,
+        direction: "outbound",
+        body: message,
+        delivered: true,
+        sent_at: now,
+      });
+      if (messageError) {
+        toast.error("Could not save reply");
+        return;
+      }
+      await db.from("sms_threads").update({ last_message_at: now }).eq("id", active.id).eq("company_id", companyId);
+      setDraft("");
+      toast.success("Reply saved");
+      await loadThreads();
+      return;
+    }
+
+    const newMsg = { id: crypto.randomUUID(), from: "ai" as const, body: message, at: new Date().toISOString() };
     setThreads((p) => p.map((t) => t.id === active.id ? { ...t, messages: [...t.messages, newMsg], unread: 0 } : t));
     setDraft("");
     toast.success("Reply sent (demo)");
   };
 
-  const toggleFlag = (id: string) =>
+  const toggleFlag = async (id: string) => {
+    const thread = threads.find((t) => t.id === id);
+    if (isNew && companyId && thread) {
+      const db = supabase as any;
+      await db.from("sms_threads").update({ flagged: !thread.flagged }).eq("id", id).eq("company_id", companyId);
+      await loadThreads();
+      return;
+    }
     setThreads((p) => p.map((t) => t.id === id ? { ...t, flagged: !t.flagged } : t));
+  };
 
-  const open = (id: string) => {
+  const open = async (id: string) => {
     setActiveId(id);
+    if (isNew && companyId) {
+      const db = supabase as any;
+      await db.from("sms_threads").update({ unread: 0 }).eq("id", id).eq("company_id", companyId);
+      await loadThreads();
+      return;
+    }
     setThreads((p) => p.map((t) => t.id === id ? { ...t, unread: 0 } : t));
   };
 
@@ -96,6 +196,7 @@ const Sms = () => {
   return (
     <AppShell>
       <PageHeader title="Messages" subtitle="Two-way conversations the AI handled." />
+      {loading && <p className="text-xs text-muted-foreground mb-2">Loading messages…</p>}
       {(() => {
         const totalThreads = threads.length;
         const totalUnread = threads.reduce((a, t) => a + t.unread, 0);

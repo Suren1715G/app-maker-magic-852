@@ -31,15 +31,76 @@ Deno.serve(async (req) => {
       params = await req.json();
     }
 
+    const messageSid = params.MessageSid || params.SmsSid;
     const callSid = params.CallSid;
     const direction = (params.Direction || "inbound").toLowerCase();
     const fromNumber = params.From;
     const toNumber = params.To;
+    const messageBody = params.Body || "";
     const callStatus = (params.CallStatus || "").toLowerCase();
     const recordingUrl = params.RecordingUrl
       ? `${params.RecordingUrl}.mp3`
       : null;
     const duration = parseInt(params.CallDuration ?? params.Duration ?? "0", 10);
+
+    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+    if (messageSid) {
+      const isInbound = !direction.includes("outbound");
+      const ourNumber = isInbound ? toNumber : fromNumber;
+      const otherParty = isInbound ? fromNumber : toNumber;
+
+      const { data: mapping } = await supabase
+        .from("company_phone_numbers")
+        .select("company_id")
+        .eq("phone_number", ourNumber)
+        .maybeSingle();
+
+      if (!mapping?.company_id) {
+        console.warn(`No company mapped for Twilio SMS number ${ourNumber}`);
+        return new Response("<Response/>", {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "text/xml" },
+        });
+      }
+
+      const sentAt = params.DateSent ? new Date(params.DateSent).toISOString() : new Date().toISOString();
+      const delivered = !["failed", "undelivered"].includes((params.MessageStatus || params.SmsStatus || "").toLowerCase());
+      const { data: thread, error: threadError } = await supabase
+        .from("sms_threads")
+        .upsert(
+          {
+            company_id: mapping.company_id,
+            phone: otherParty,
+            customer: params.ProfileName || otherParty || "Unknown customer",
+            unread: isInbound ? 1 : 0,
+            last_message_at: sentAt,
+          },
+          { onConflict: "company_id,phone" },
+        )
+        .select("id")
+        .single();
+      if (threadError) throw threadError;
+
+      const { error: messageError } = await supabase.from("sms_messages").upsert(
+        {
+          company_id: mapping.company_id,
+          thread_id: thread.id,
+          direction: isInbound ? "inbound" : "outbound",
+          body: messageBody,
+          delivered,
+          external_id: messageSid,
+          sent_at: sentAt,
+        },
+        { onConflict: "external_id" },
+      );
+      if (messageError) throw messageError;
+
+      return new Response("<Response/>", {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "text/xml" },
+      });
+    }
 
     if (!callSid) {
       return new Response(
@@ -52,8 +113,6 @@ Deno.serve(async (req) => {
     // Outbound: call placed FROM our Twilio number `From`.
     const ourNumber = direction.startsWith("inbound") ? toNumber : fromNumber;
     const otherParty = direction.startsWith("inbound") ? fromNumber : toNumber;
-
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     const { data: mapping } = await supabase
       .from("company_phone_numbers")
