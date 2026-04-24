@@ -1,12 +1,25 @@
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { calls as mockCalls, type CallTag } from "@/data/mock";
+import { type CallTag } from "@/data/mock";
 import { fmtDuration, fmtRel } from "@/lib/format";
 import { Link } from "react-router-dom";
 import { CheckCircle2, PhoneIncoming, PhoneMissed } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { StatCard } from "@/components/app/StatCard";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+
+type LiveCall = {
+  id: string;
+  caller: string | null;
+  phone: string | null;
+  startedAt: string;
+  durationSec: number;
+  status: "booked" | "answered" | "missed-followup";
+  summary: string | null;
+  tag: CallTag | null;
+};
 
 const filters = [
   { id: "all", label: "All" },
@@ -38,7 +51,57 @@ const ranges = [
 
 const Calls = () => {
   const isNew = useIsNewCustomer();
-  const calls = isNew ? [] : mockCalls;
+  const { companyId } = useAuth();
+  const [calls, setCalls] = useState<LiveCall[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!companyId) {
+      setCalls([]);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+
+    const load = async () => {
+      const { data } = await supabase
+        .from("calls")
+        .select("id, caller, phone, started_at, duration_sec, status, summary, tag")
+        .eq("company_id", companyId)
+        .order("started_at", { ascending: false })
+        .limit(200);
+      if (cancelled) return;
+      setCalls(
+        (data ?? []).map((c) => ({
+          id: c.id,
+          caller: c.caller,
+          phone: c.phone,
+          startedAt: c.started_at,
+          durationSec: c.duration_sec,
+          status: (c.status as LiveCall["status"]) ?? "answered",
+          summary: c.summary,
+          tag: (c.tag as CallTag | null) ?? null,
+        })),
+      );
+      setLoading(false);
+    };
+    load();
+
+    const channel = supabase
+      .channel(`calls:${companyId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "calls", filter: `company_id=eq.${companyId}` },
+        () => load(),
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [companyId]);
+
   const [filter, setFilter] = useState<(typeof filters)[number]["id"]>("all");
   const [tag, setTag] = useState<"any" | CallTag>("any");
   const [range, setRange] = useState<(typeof ranges)[number]["id"]>("all");
@@ -70,6 +133,9 @@ const Calls = () => {
   return (
     <AppShell>
       <PageHeader title="Calls" subtitle="Every conversation, captured." />
+      {loading && companyId && (
+        <p className="text-xs text-muted-foreground mb-2">Loading calls…</p>
+      )}
 
       <p className="sr-only" aria-label={summarySentence}>{summarySentence}</p>
 
@@ -177,7 +243,11 @@ const Calls = () => {
           );
         })}
         {list.length === 0 && (
-          <li className="text-center text-muted-foreground py-12 text-sm">No calls in this view.</li>
+          <li className="text-center text-muted-foreground py-12 text-sm">
+            {isNew || calls.length === 0
+              ? "No calls yet. They'll appear here automatically as soon as your AI receptionist or Twilio number receives one."
+              : "No calls in this view."}
+          </li>
         )}
       </ul>
     </AppShell>
