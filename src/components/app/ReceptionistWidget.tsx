@@ -207,7 +207,7 @@ export function ReceptionistWidget() {
           } Ask the user to clarify.`;
         }
         // Don't actually click — undo by stopping here. We just return preview.
-        return `PREVIEW (not yet clicked): I will click "${probe.matched}".${
+        return `PREVIEW (not yet clicked): I will click "${probe.matched ?? label}".${
           probe.destructive
             ? " This looks DESTRUCTIVE — repeat it back to the user and require an explicit yes before calling again with confirmed=true."
             : " Confirm with the user, then call again with confirmed=true."
