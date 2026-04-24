@@ -201,13 +201,19 @@ function buildClientTools() {
     {
       type: "client",
       name: "open_location_request_form",
-      description: "Use this when the user asks to request/add a new location. It visibly navigates to Settings and clicks the real 'Request a new location' button. Must be called with confirmed=false first, then confirmed=true after user confirmation. Never claim the form is open unless this tool returns success.",
+      description: "Use this for 'request/add a new location'. It visibly navigates to Settings, clicks the real 'Request a new location' button, then types the field values on screen so the user can watch. Call once with confirmed=false (preview), get verbal yes, then call again with confirmed=true and pass the field values. To actually send the request, call again with submit=true after the user confirms. Never claim the form is open or submitted unless the tool returns success.",
       expects_response: true,
-      response_timeout_secs: 30,
+      response_timeout_secs: 45,
       parameters: {
         type: "object",
         required: ["confirmed"],
-        properties: { confirmed: { type: "boolean", description: "false for preview; true only after user confirmation." } },
+        properties: {
+          confirmed: { type: "boolean", description: "false for preview; true only after user confirmation." },
+          location_name: { type: "string", description: "Visible name to type into the Location name field." },
+          locations_wanted: { type: "number", description: "Number to type into the 'How many new locations' field. Defaults to 1 if omitted." },
+          note: { type: "string", description: "Optional note to type into the 'Anything we should know' field." },
+          submit: { type: "boolean", description: "If true, also press the visible 'Send request' button. Only set true after the user has verbally confirmed the values shown on screen." },
+        },
       },
     },
   ];
@@ -218,7 +224,7 @@ function injectCompanyContext(
   companyName: string,
   companyId: string,
 ) {
-  const block = `\n\n---\nYou are the AI receptionist and assistant for "${companyName}".\n\nUse tools to do real work. NEVER say you clicked, opened, submitted, toggled, sent, or completed something unless a tool returned success.\n\nYou have server tools for business data and server-only actions, plus client tools for controlling the visible app screen.\n\nWhen the user asks about calls, leads, customers, missed calls, recent activity, phone numbers, or business information — use lookup_business_data. Do NOT make up numbers.\n\nWhen the user asks to control the app UI (click, toggle, switch off/on, open, fill, save, submit, change a setting), use the client tools. First use list_actions if unsure, then click_element/fill_field with confirmed=false, get verbal yes, then confirmed=true. Toggle switches such as Push notifications and Dark mode are clickable elements.\n\nFor requesting/adding a new location: NEVER use perform_action and NEVER just say you are doing it. Use open_location_request_form with confirmed=false, get yes, call it with confirmed=true, then ask for the field values and fill the real on-screen form. Only after click_element('Send request', confirmed=true) succeeds may you say the request was submitted.\n\nUse perform_action only for actions without an on-screen form: tag a call, send SMS, create note/reminder. Always confirm first.\n\nAlways pass company_id="${companyId}" exactly as-is to server tools.\n---\n`;
+  const block = `\n\n---\nYou are the AI receptionist and assistant for "${companyName}".\n\nUse tools to do real work. NEVER say you clicked, opened, submitted, toggled, sent, or completed something unless a tool returned success.\n\nYou have server tools for business data and server-only actions, plus client tools for controlling the visible app screen.\n\nWhen the user asks about calls, leads, customers, missed calls, recent activity, phone numbers, or business information — use lookup_business_data. Do NOT make up numbers.\n\nWhen the user asks to control the app UI (click, toggle, switch off/on, open, fill, save, submit, change a setting), use the client tools. First use list_actions if unsure, then click_element/fill_field with confirmed=false, get verbal yes, then confirmed=true. Toggle switches such as Push notifications and Dark mode are clickable elements.\n\nFor requesting/adding a new location, ALWAYS use the open_location_request_form tool — never perform_action and never just narrate. The user wants to WATCH every step happen on screen. Recipe:\n  1. Ask the user for: location name, how many locations (default 1), and any optional note.\n  2. Call open_location_request_form with confirmed=false to preview. Tell the user exactly what you'll type.\n  3. After the user says yes, call it with confirmed=true and pass location_name, locations_wanted, and note. The tool will visibly open the form and type each field on screen.\n  4. Read back what's now on screen and ask the user to confirm sending.\n  5. Only after a verbal yes, call open_location_request_form again with confirmed=true, the same field values, and submit=true. Only then may you say the request was submitted.\n\nUse perform_action only for actions without an on-screen form: tag a call, send SMS, create note/reminder. Always confirm first.\n\nAlways pass company_id="${companyId}" exactly as-is to server tools.\n---\n`;
   return (baseSystemPrompt ?? "") + block;
 }
 

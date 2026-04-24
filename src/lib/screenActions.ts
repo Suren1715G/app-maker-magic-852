@@ -161,7 +161,40 @@ export type FillResult = {
   candidates?: string[];
 };
 
-export function fillFieldByLabel(label: string, value: string): FillResult {
+function setNativeValue(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const proto =
+    input.tagName === "TEXTAREA"
+      ? window.HTMLTextAreaElement.prototype
+      : window.HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+  setter?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function focusGlow(el: HTMLElement) {
+  const prev = {
+    outline: el.style.outline,
+    outlineOffset: el.style.outlineOffset,
+    boxShadow: el.style.boxShadow,
+    transition: el.style.transition,
+  };
+  el.style.transition = "box-shadow 150ms ease, outline-color 150ms ease";
+  el.style.outline = "2px solid hsl(var(--primary))";
+  el.style.outlineOffset = "2px";
+  el.style.boxShadow = "0 0 0 4px hsl(var(--primary) / 0.25)";
+  return () => {
+    el.style.outline = prev.outline;
+    el.style.outlineOffset = prev.outlineOffset;
+    el.style.boxShadow = prev.boxShadow;
+    el.style.transition = prev.transition;
+  };
+}
+
+export async function fillFieldByLabel(
+  label: string,
+  value: string,
+  opts?: { animate?: boolean; charDelayMs?: number },
+): Promise<FillResult> {
   if (!label || typeof document === "undefined") {
     return { ok: false, reason: "No field label provided" };
   }
@@ -181,23 +214,56 @@ export function fillFieldByLabel(label: string, value: string): FillResult {
   }
 
   const el = best.el as HTMLInputElement | HTMLTextAreaElement | HTMLElement;
-  (el as HTMLElement).scrollIntoView({ block: "center", behavior: "smooth" });
+  const animate = opts?.animate !== false;
+  const charDelay = opts?.charDelayMs ?? 55;
 
-  if ((el as HTMLElement).getAttribute("contenteditable") === "true") {
-    (el as HTMLElement).innerText = value;
+  (el as HTMLElement).scrollIntoView({ block: "center", behavior: "smooth" });
+  await new Promise((r) => window.setTimeout(r, 350));
+  const removeGlow = focusGlow(el as HTMLElement);
+  (el as HTMLElement).focus({ preventScroll: true });
+
+  const isContentEditable = (el as HTMLElement).getAttribute("contenteditable") === "true";
+  const inputEl = el as HTMLInputElement | HTMLTextAreaElement;
+  const isNumber = !isContentEditable && (inputEl as HTMLInputElement).type === "number";
+
+  if (isContentEditable) {
+    (el as HTMLElement).innerText = "";
     el.dispatchEvent(new Event("input", { bubbles: true }));
   } else {
-    const input = el as HTMLInputElement | HTMLTextAreaElement;
-    const proto =
-      input.tagName === "TEXTAREA"
-        ? window.HTMLTextAreaElement.prototype
-        : window.HTMLInputElement.prototype;
-    const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
-    setter?.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
+    setNativeValue(inputEl, "");
   }
 
+  if (!animate || isNumber) {
+    // Number inputs can't show partial typing nicely — just set the final value.
+    if (isContentEditable) {
+      (el as HTMLElement).innerText = value;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    } else {
+      setNativeValue(inputEl, value);
+      inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    await new Promise((r) => window.setTimeout(r, 200));
+  } else {
+    let typed = "";
+    for (const ch of value) {
+      typed += ch;
+      if (isContentEditable) {
+        (el as HTMLElement).innerText = typed;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      } else {
+        setNativeValue(inputEl, typed);
+      }
+      // Slight randomization for a human typing feel
+      const jitter = Math.random() * 40;
+      await new Promise((r) => window.setTimeout(r, charDelay + jitter));
+    }
+    if (!isContentEditable) {
+      inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+
+  await new Promise((r) => window.setTimeout(r, 250));
+  removeGlow();
   return { ok: true, matchedLabel: best.label.trim().slice(0, 80) };
 }
 

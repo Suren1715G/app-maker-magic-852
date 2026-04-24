@@ -297,7 +297,7 @@ export function ReceptionistWidget() {
         } to "${value}". Confirm with the user, then call again with confirmed=true.`;
       }
 
-      const result = fillFieldByLabel(label, value);
+      const result = await fillFieldByLabel(label, value);
       if (!result.ok) {
         return `Fill failed: ${result.reason}${
           result.candidates?.length
@@ -324,10 +324,16 @@ export function ReceptionistWidget() {
   // collecting form fields from the user.
   useConversationClientTool(
     "open_location_request_form",
-    async (params: { confirmed?: boolean | string }) => {
+    async (params: {
+      confirmed?: boolean | string;
+      location_name?: string;
+      locations_wanted?: number | string;
+      note?: string;
+      submit?: boolean | string;
+    }) => {
       const confirmed = params?.confirmed === true || params?.confirmed === "true";
       if (!confirmed) {
-        return 'PREVIEW (not yet opened): I will open Settings and click the visible "Request a new location" button so you can watch the form appear. Confirm with the user, then call again with confirmed=true.';
+        return 'PREVIEW (not yet opened): I will open Settings, click the visible "Request a new location" button, then type each field on screen so the user can watch. Confirm with the user, then call again with confirmed=true and pass the field values you collected.';
       }
 
       navigate("/settings");
@@ -351,10 +357,57 @@ export function ReceptionistWidget() {
         return `Click did not open the location request form. Visible buttons: ${controls.clickable.slice(0, 12).join(", ")}. Do not claim it opened; ask the user to try again after Settings finishes loading.`;
       }
 
+      // Optional: visibly type each field if values were provided.
+      const filled: string[] = [];
+      const locName = (params?.location_name ?? "").toString().trim();
+      if (locName) {
+        await wait(400);
+        const r = await fillFieldByLabel("Location name", locName, { animate: true, charDelayMs: 60 });
+        if (r.ok) filled.push(`Location name = "${locName}"`);
+      }
+
+      const wantedRaw = params?.locations_wanted;
+      const wanted =
+        typeof wantedRaw === "number"
+          ? wantedRaw
+          : typeof wantedRaw === "string" && wantedRaw.trim() !== ""
+            ? Number(wantedRaw)
+            : null;
+      if (wanted && Number.isFinite(wanted) && wanted >= 1) {
+        await wait(350);
+        const r = await fillFieldByLabel("How many new locations", String(Math.floor(wanted)), {
+          animate: false,
+        });
+        if (r.ok) filled.push(`How many new locations = ${Math.floor(wanted)}`);
+      }
+
+      const note = (params?.note ?? "").toString().trim();
+      if (note) {
+        await wait(350);
+        const r = await fillFieldByLabel("Anything we should know", note, {
+          animate: true,
+          charDelayMs: 35,
+        });
+        if (r.ok) filled.push(`Note = "${note}"`);
+      }
+
+      const shouldSubmit = params?.submit === true || params?.submit === "true";
+      let submitted = false;
+      if (shouldSubmit && locName) {
+        await wait(450);
+        const submitRes = await clickByLabel("Send request", { allowDestructive: true });
+        submitted = submitRes.ok;
+      }
+
       const snap = await captureVisibleScreenAfterDelay(700, 6000);
       return [
-        'Opened the real "Request a new location" form on screen.',
-        "Next: ask the user for the location name and spelling, number of locations, and any note. Then fill the visible fields one by one with fill_field confirm-first.",
+        'Opened the "Request a new location" form on screen.',
+        filled.length ? `Typed visibly: ${filled.join("; ")}.` : "No field values were provided yet.",
+        shouldSubmit
+          ? submitted
+            ? 'Pressed "Send request" — confirm to the user only what the screen now shows.'
+            : 'Did NOT submit — "Send request" button could not be clicked. Do not claim it was sent.'
+          : "Form is open and ready. If the user wants to send it, call this tool again with submit=true.",
         "----- BEGIN VISIBLE SCREEN -----",
         snap.content || "(empty)",
         "----- END VISIBLE SCREEN -----",
