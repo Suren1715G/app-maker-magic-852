@@ -188,6 +188,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const lookupTool = buildAssistantTool(SUPABASE_URL, ASSISTANT_TOOL_SECRET, company_id);
+    const actionTool = buildActionTool(SUPABASE_URL, ASSISTANT_TOOL_SECRET, company_id);
 
     if (existing?.agent_id) {
       // Fetch current config, ensure lookup tool + company context block are present.
@@ -264,6 +265,7 @@ Deno.serve(async (req) => {
             tools: [
               ...(Array.isArray(basePrompt?.tools) ? basePrompt.tools : []),
               lookupTool,
+              actionTool,
             ],
           },
         },
