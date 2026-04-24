@@ -55,6 +55,74 @@ export type Database = {
           },
         ]
       }
+      calls: {
+        Row: {
+          caller: string | null
+          company_id: string
+          created_at: string
+          direction: string | null
+          duration_sec: number
+          external_id: string | null
+          id: string
+          metadata: Json | null
+          phone: string | null
+          recording_url: string | null
+          source: Database["public"]["Enums"]["call_source"]
+          started_at: string
+          status: string
+          summary: string | null
+          tag: string | null
+          transcript: Json | null
+          updated_at: string
+        }
+        Insert: {
+          caller?: string | null
+          company_id: string
+          created_at?: string
+          direction?: string | null
+          duration_sec?: number
+          external_id?: string | null
+          id?: string
+          metadata?: Json | null
+          phone?: string | null
+          recording_url?: string | null
+          source: Database["public"]["Enums"]["call_source"]
+          started_at?: string
+          status?: string
+          summary?: string | null
+          tag?: string | null
+          transcript?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          caller?: string | null
+          company_id?: string
+          created_at?: string
+          direction?: string | null
+          duration_sec?: number
+          external_id?: string | null
+          id?: string
+          metadata?: Json | null
+          phone?: string | null
+          recording_url?: string | null
+          source?: Database["public"]["Enums"]["call_source"]
+          started_at?: string
+          status?: string
+          summary?: string | null
+          tag?: string | null
+          transcript?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calls_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           ai_first_message: string | null
@@ -84,6 +152,67 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      company_elevenlabs_agents: {
+        Row: {
+          agent_id: string
+          company_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          agent_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          agent_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_elevenlabs_agents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_phone_numbers: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          phone_number: string
+          provider: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          phone_number: string
+          provider?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          phone_number?: string
+          provider?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_phone_numbers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -187,6 +316,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "company_admin"
+      call_source: "elevenlabs" | "twilio" | "manual"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -315,6 +445,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "company_admin"],
+      call_source: ["elevenlabs", "twilio", "manual"],
     },
   },
 } as const
