@@ -134,6 +134,31 @@ Deno.serve(async (req) => {
 
         try {
           const result = await sendSms(to, from, message);
+          const sentAt = new Date().toISOString();
+          const { data: thread, error: threadError } = await admin
+            .from("sms_threads")
+            .upsert(
+              { company_id, phone: to, customer: to, last_message_at: sentAt },
+              { onConflict: "company_id,phone" },
+            )
+            .select("id")
+            .single();
+          if (threadError) throw threadError;
+
+          const { error: messageError } = await admin.from("sms_messages").upsert(
+            {
+              company_id,
+              thread_id: thread.id,
+              direction: "outbound",
+              body: message,
+              delivered: true,
+              external_id: result?.sid ?? null,
+              sent_at: sentAt,
+            },
+            { onConflict: "external_id" },
+          );
+          if (messageError) throw messageError;
+
           return json({ ok: true, message: "SMS sent.", sid: result?.sid });
         } catch (e) {
           console.error("SMS error", e);
