@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Zap, Monitor, Smartphone, MapPin, Phone as PhoneIcon, Clock } from "lucide-react";
+import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Zap, Monitor, Smartphone, MapPin, Phone as PhoneIcon, Clock, CalendarPlus, CheckCircle2 } from "lucide-react";
 import { sessions } from "@/data/mock";
 import { fmtRel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ const Settings = () => {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [savingAi, setSavingAi] = useState(false);
 
-  // Locations (phone numbers per location, stored in company_phone_numbers)
+  // Active locations (read-only — admin manages via Master)
   type LocationRow = {
     id: string;
     label: string | null;
@@ -47,9 +47,25 @@ const Settings = () => {
     created_at: string;
   };
   const [locations, setLocations] = useState<LocationRow[]>([]);
-  const [newLocLabel, setNewLocLabel] = useState("");
-  const [newLocPhone, setNewLocPhone] = useState("");
-  const [addingLoc, setAddingLoc] = useState(false);
+
+  // Location requests (customer-initiated, requires meeting with admin)
+  type LocationRequest = {
+    id: string;
+    location_name: string;
+    locations_wanted: number;
+    note: string | null;
+    status: "new" | "contacted" | "scheduled" | "closed";
+    created_at: string;
+  };
+  const [requests, setRequests] = useState<LocationRequest[]>([]);
+  const [reqOpen, setReqOpen] = useState(false);
+  const [reqLocName, setReqLocName] = useState("");
+  const [reqCount, setReqCount] = useState(1);
+  const [reqNote, setReqNote] = useState("");
+  const [submittingReq, setSubmittingReq] = useState(false);
+  const [justSubmitted, setJustSubmitted] = useState(false);
+
+  const CALENDLY_URL = "https://calendly.com/sgsaireception";
 
   const [services, setServices] = useState(["Deep Clean", "Move-out Clean", "Office Clean", "Standard Clean"]);
   const [newSvc, setNewSvc] = useState("");
@@ -128,6 +144,7 @@ const Settings = () => {
       if (company?.ai_first_message) setGreeting(company.ai_first_message);
       if (company?.ai_voice_id) setAiVoiceId(company.ai_voice_id);
       await loadLocations(profile.company_id);
+      await loadRequests(profile.company_id);
     })();
   }, [user]);
 
@@ -140,47 +157,44 @@ const Settings = () => {
     setLocations((data ?? []) as LocationRow[]);
   };
 
-  const addLocation = async () => {
-    if (!companyId) {
-      toast.error("No company linked to your account");
-      return;
-    }
-    const label = newLocLabel.trim();
-    const number = newLocPhone.trim();
-    if (!label) return toast.error("Give the location a name");
-    if (!/^\+?[0-9 ()\-]{7,20}$/.test(number)) return toast.error("Enter a valid phone number");
-    setAddingLoc(true);
-    const { error } = await supabase.from("company_phone_numbers").insert({
-      company_id: companyId,
-      label,
-      phone_number: number,
-      provider: "twilio",
-      status: "pending",
-      requested_by: user?.id,
-    });
-    setAddingLoc(false);
-    if (error) {
-      if (error.message?.includes("duplicate")) {
-        toast.error("That phone number is already in use");
-      } else {
-        toast.error(error.message ?? "Could not add location");
-      }
-      return;
-    }
-    toast.success("Location requested — we'll activate it shortly");
-    setNewLocLabel("");
-    setNewLocPhone("");
-    await loadLocations(companyId);
+  const loadRequests = async (cid: string) => {
+    const { data } = await supabase
+      .from("location_requests")
+      .select("id, location_name, locations_wanted, note, status, created_at")
+      .eq("company_id", cid)
+      .order("created_at", { ascending: false });
+    setRequests((data ?? []) as LocationRequest[]);
   };
 
-  const removePendingLocation = async (id: string) => {
-    const { error } = await supabase.from("company_phone_numbers").delete().eq("id", id);
+  const submitLocationRequest = async () => {
+    if (!companyId || !user) return toast.error("No company linked to your account");
+    const name = reqLocName.trim();
+    if (!name) return toast.error("Give the new location a name");
+    if (reqCount < 1 || reqCount > 50) return toast.error("Enter a valid number of locations");
+    setSubmittingReq(true);
+    const { error } = await supabase.from("location_requests").insert({
+      company_id: companyId,
+      requested_by: user.id,
+      location_name: name,
+      locations_wanted: reqCount,
+      note: reqNote.trim() || null,
+    });
+    setSubmittingReq(false);
     if (error) {
-      toast.error("Could not remove — only pending locations can be deleted");
+      toast.error(error.message ?? "Could not submit request");
       return;
     }
-    toast.success("Location removed");
-    if (companyId) await loadLocations(companyId);
+    toast.success("Request sent — book a time below");
+    setJustSubmitted(true);
+    await loadRequests(companyId);
+  };
+
+  const resetRequestForm = () => {
+    setReqOpen(false);
+    setReqLocName("");
+    setReqCount(1);
+    setReqNote("");
+    setJustSubmitted(false);
   };
 
   const saveAi = async () => {
@@ -252,11 +266,8 @@ const Settings = () => {
       </Section>
 
       <Section title="Locations & phone numbers">
-        <div className="px-4 py-3 text-[11px] text-muted-foreground">
-          Add a phone number for each business location. New numbers stay <span className="text-foreground font-medium">pending</span> until our team activates routing — usually within 1 business day.
-        </div>
         {locations.length > 0 && (
-          <ul className="px-4 pb-2 divide-y divide-border/60">
+          <ul className="px-4 pt-3 pb-1 divide-y divide-border/60">
             {locations.map((l) => {
               const tone =
                 l.status === "active"
@@ -277,46 +288,131 @@ const Settings = () => {
                   <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${tone}`}>
                     {l.status}
                   </span>
-                  {l.status === "pending" && (
-                    <button
-                      onClick={() => removePendingLocation(l.id)}
-                      className="text-muted-foreground hover:text-destructive ml-1"
-                      aria-label="Remove pending location"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
                 </li>
               );
             })}
           </ul>
         )}
-        <div className="px-4 pb-3 grid sm:grid-cols-[1fr_1fr_auto] gap-2">
-          <div className="relative">
-            <MapPin className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={newLocLabel}
-              onChange={(e) => setNewLocLabel(e.target.value)}
-              placeholder="Location name"
-              className="h-9 pl-8"
-              maxLength={60}
-            />
+
+        {!reqOpen ? (
+          <div className="px-4 py-4">
+            <div className="rounded-xl border border-border/60 bg-secondary/20 p-4">
+              <div className="flex items-start gap-3">
+                <span className="h-9 w-9 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                  <CalendarPlus className="h-4 w-4" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">Add a new location</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    Adding a location includes a new phone number, AI setup, and routing. Pricing depends on call volume — let's chat to scope it.
+                  </div>
+                </div>
+              </div>
+              <Button size="sm" className="w-full mt-3" onClick={() => setReqOpen(true)} disabled={!companyId}>
+                <CalendarPlus className="h-3.5 w-3.5" /> Request a new location
+              </Button>
+            </div>
+
+            {requests.length > 0 && (
+              <div className="mt-4">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Your requests</div>
+                <ul className="divide-y divide-border/60">
+                  {requests.map((r) => {
+                    const tone =
+                      r.status === "scheduled"
+                        ? "bg-success/15 text-success"
+                        : r.status === "contacted"
+                          ? "bg-accent/15 text-accent"
+                          : r.status === "closed"
+                            ? "bg-muted text-muted-foreground"
+                            : "bg-primary/15 text-primary";
+                    return (
+                      <li key={r.id} className="py-2.5 flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm truncate">{r.location_name}</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {r.locations_wanted} location{r.locations_wanted > 1 ? "s" : ""} · {fmtRel(r.created_at)}
+                          </div>
+                        </div>
+                        <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${tone}`}>
+                          {r.status}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
           </div>
-          <div className="relative">
-            <PhoneIcon className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={newLocPhone}
-              onChange={(e) => setNewLocPhone(e.target.value)}
-              placeholder="+1 555 123 4567"
-              className="h-9 pl-8"
-              maxLength={20}
-              inputMode="tel"
-            />
+        ) : justSubmitted ? (
+          <div className="px-4 py-5">
+            <div className="rounded-xl border border-success/30 bg-success/10 p-4 text-center">
+              <span className="inline-flex h-10 w-10 rounded-full bg-success/20 text-success items-center justify-center mb-2">
+                <CheckCircle2 className="h-5 w-5" />
+              </span>
+              <div className="text-sm font-medium">Request received!</div>
+              <div className="text-[11px] text-muted-foreground mt-1 mb-3">
+                Pick a time that works for you and we'll walk through pricing and setup.
+              </div>
+              <a
+                href={CALENDLY_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors w-full"
+              >
+                <CalendarPlus className="h-3.5 w-3.5" /> Book a meeting
+              </a>
+              <button
+                onClick={resetRequestForm}
+                className="text-[11px] text-muted-foreground hover:text-foreground mt-2.5"
+              >
+                Done
+              </button>
+            </div>
           </div>
-          <Button size="sm" onClick={addLocation} disabled={addingLoc || !companyId}>
-            <Plus className="h-3.5 w-3.5" /> {addingLoc ? "Adding…" : "Add location"}
-          </Button>
-        </div>
+        ) : (
+          <div className="px-4 py-3 space-y-3">
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Location name</div>
+              <Input
+                value={reqLocName}
+                onChange={(e) => setReqLocName(e.target.value)}
+                placeholder="e.g. Downtown branch"
+                className="h-9"
+                maxLength={80}
+                autoFocus
+              />
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">How many new locations?</div>
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                value={reqCount}
+                onChange={(e) => setReqCount(Number(e.target.value) || 1)}
+                className="h-9"
+              />
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Anything we should know? <span className="opacity-60">(optional)</span></div>
+              <textarea
+                value={reqNote}
+                onChange={(e) => setReqNote(e.target.value)}
+                rows={3}
+                maxLength={500}
+                placeholder="Service area, expected call volume, timing…"
+                className="w-full rounded-xl bg-input border border-border p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button size="sm" variant="outline" onClick={resetRequestForm}>Cancel</Button>
+              <Button size="sm" onClick={submitLocationRequest} disabled={submittingReq}>
+                {submittingReq ? "Sending…" : "Send request"}
+              </Button>
+            </div>
+          </div>
+        )}
       </Section>
 
       <Section title="AI receptionist">
