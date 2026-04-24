@@ -10,7 +10,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { captureVisibleScreenAfterDelay } from "@/lib/screenContext";
-import { clickByLabel, fillFieldByLabel, listVisibleControls } from "@/lib/screenActions";
 import { JarvisNetwork } from "./JarvisNetwork";
 
 type Transcript = { id: string; role: "user" | "agent"; text: string };
@@ -21,50 +20,6 @@ type VoiceTokenResponse = {
   code?: string;
   retryable?: boolean;
 };
-
-function wait(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-async function waitForEnabledElement(selector: string, timeoutMs = 5000) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const el = document.querySelector(selector) as HTMLElement | null;
-    const disabled = el?.matches("[disabled], [aria-disabled='true']") || (el as HTMLButtonElement | null)?.disabled;
-    if (el && !disabled) return el;
-    await wait(150);
-  }
-  return null;
-}
-
-// Visibly highlight an element so the user can see Jarvis interacting with it.
-async function highlightAndPress(el: HTMLElement, holdMs = 700) {
-  el.scrollIntoView({ block: "center", behavior: "smooth" });
-  await wait(450);
-  const prev = {
-    outline: el.style.outline,
-    outlineOffset: el.style.outlineOffset,
-    boxShadow: el.style.boxShadow,
-    transition: el.style.transition,
-    transform: el.style.transform,
-  };
-  el.style.transition = "transform 150ms ease, box-shadow 150ms ease, outline-color 150ms ease";
-  el.style.outline = "3px solid hsl(var(--primary))";
-  el.style.outlineOffset = "3px";
-  el.style.boxShadow = "0 0 0 6px hsl(var(--primary) / 0.25), 0 12px 32px hsl(var(--primary) / 0.35)";
-  await wait(holdMs);
-  // Press effect
-  el.style.transform = "scale(0.96)";
-  await wait(160);
-  el.click();
-  el.style.transform = "scale(1)";
-  await wait(260);
-  el.style.outline = prev.outline;
-  el.style.outlineOffset = prev.outlineOffset;
-  el.style.boxShadow = prev.boxShadow;
-  el.style.transition = prev.transition;
-  el.style.transform = prev.transform;
-}
 
 function isQuotaMessage(message?: string | null) {
   return /quota|credits? remaining|payment required|insufficient credits/i.test(message ?? "");
