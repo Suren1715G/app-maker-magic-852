@@ -27,6 +27,7 @@ import Billing from "./pages/app/Billing";
 import Referrals from "./pages/app/Referrals";
 import Support from "./pages/app/Support";
 import Assistant from "./pages/app/Assistant";
+import Notes from "./pages/app/Notes";
 import MasterOverview from "./pages/master/MasterOverview";
 import MasterCompanies from "./pages/master/MasterCompanies";
 import MasterCompanyDetail from "./pages/master/MasterCompanyDetail";
@@ -82,6 +83,7 @@ const App = () => (
               <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
               <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
               <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />
+              <Route path="/notes" element={<ProtectedRoute><Notes /></ProtectedRoute>} />
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
