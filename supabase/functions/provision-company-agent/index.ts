@@ -71,10 +71,9 @@ function buildAssistantTool(supabaseUrl: string, secret: string, companyId: stri
             type: "string",
             description: "For search_calls — phone number or caller name.",
           },
-          // company_id is injected server-side as a constant value below
+          // company_id is injected server-side as a constant value
           company_id: {
             type: "string",
-            description: "Always pass this exact value, never change it.",
             constant_value: companyId,
           },
         },
@@ -128,7 +127,6 @@ function buildActionTool(supabaseUrl: string, secret: string, companyId: string)
           note: { type: "string", description: "For create_location_request — optional context." },
           company_id: {
             type: "string",
-            description: "Always pass this exact value, never change it.",
             constant_value: companyId,
           },
         },
