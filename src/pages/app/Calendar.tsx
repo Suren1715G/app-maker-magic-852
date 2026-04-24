@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
+import { useEffect } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { bookings as mockBookings, type Booking } from "@/data/mock";
 import { fmtTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ChevronLeft, ChevronRight, Clock, MoreVertical, CalendarX, UserX, CalendarClock, Link2 } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock, MoreVertical, CalendarX, UserX, CalendarClock, Link2, Loader2, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
@@ -11,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
+import { supabase } from "@/integrations/supabase/client";
 
 type View = "month" | "week" | "day";
 
@@ -59,6 +61,100 @@ const Calendar = () => {
   const [selected, setSelected] = useState<Date>(startOfDay(today));
   const [items, setItems] = useState<Booking[]>(isNew ? [] : mockBookings);
   const [scope, setScope] = useState<"upcoming" | "past" | "all">("all");
+
+  // Google Calendar connection
+  const [gcalStatus, setGcalStatus] = useState<{ connected: boolean; email: string | null } | null>(null);
+  const [gcalLoading, setGcalLoading] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+
+  const refreshStatus = async () => {
+    const { data, error } = await supabase.functions.invoke("google-calendar", {
+      body: { action: "status" },
+    });
+    if (!error && data) setGcalStatus({ connected: !!data.connected, email: data.email ?? null });
+  };
+
+  const loadEvents = async () => {
+    setGcalLoading(true);
+    try {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar?action=events`;
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message || data?.error || "Failed to load events");
+      const mapped: Booking[] = (data.items ?? []).map((e: any) => {
+        const start = e.start?.dateTime ?? (e.start?.date ? `${e.start.date}T09:00:00` : new Date().toISOString());
+        const end = e.end?.dateTime ?? (e.end?.date ? `${e.end.date}T10:00:00` : start);
+        const durationMin = Math.max(15, Math.round((+new Date(end) - +new Date(start)) / 60000));
+        return {
+          id: e.id,
+          customer: e.summary || "(no title)",
+          service: e.location || e.description?.slice(0, 60) || "Google Calendar",
+          startsAt: start,
+          durationMin,
+          smsConfirmed: true,
+          status: undefined,
+        } as Booking;
+      });
+      setItems(mapped);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load events");
+    } finally {
+      setGcalLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshStatus();
+  }, []);
+
+  useEffect(() => {
+    if (gcalStatus?.connected) loadEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gcalStatus?.connected]);
+
+  // Re-check status when window regains focus (after OAuth redirect tab closes)
+  useEffect(() => {
+    const onFocus = () => refreshStatus();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
+  const startConnect = async () => {
+    setConnecting(true);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (!token) {
+        toast.error("Please sign in first");
+        return;
+      }
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-oauth-start?return_to=${encodeURIComponent("/calendar")}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start OAuth");
+      window.location.href = data.url;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to start");
+      setConnecting(false);
+    }
+  };
+
+  const disconnect = async () => {
+    const { error } = await supabase.functions.invoke("google-calendar", {
+      body: { action: "disconnect" },
+    });
+    if (error) {
+      toast.error("Failed to disconnect");
+      return;
+    }
+    toast.success("Google Calendar disconnected");
+    setGcalStatus({ connected: false, email: null });
+    setItems(isNew ? [] : mockBookings);
+  };
 
   const filtered = useMemo(() => {
     const now = Date.now();
@@ -134,13 +230,45 @@ const Calendar = () => {
     <AppShell>
       <PageHeader
         title="Calendar"
-        subtitle="Bookings synced to Google Calendar."
+        subtitle={
+          gcalStatus?.connected
+            ? `Synced with ${gcalStatus.email ?? "Google Calendar"}.`
+            : "Connect your Google Calendar to see real events."
+        }
         right={
-          <Badge variant="secondary" className="gap-1.5">
-            <Link2 className="h-3 w-3 text-success" /> Google synced
-          </Badge>
+          gcalStatus?.connected ? (
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="gap-1.5">
+                <Link2 className="h-3 w-3 text-success" /> Google synced
+              </Badge>
+              <Button variant="ghost" size="sm" onClick={disconnect} aria-label="Disconnect Google">
+                <LogOut className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" onClick={startConnect} disabled={connecting}>
+              {connecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
+              Connect Google Calendar
+            </Button>
+          )
         }
       />
+
+      {gcalStatus && !gcalStatus.connected && (
+        <div className="glass rounded-2xl p-4 mb-4 border border-dashed">
+          <div className="text-sm">
+            <div className="font-medium mb-1">Showing demo events</div>
+            <div className="text-muted-foreground">
+              Connect your Google account to replace these with your real upcoming events.
+            </div>
+          </div>
+        </div>
+      )}
+      {gcalLoading && (
+        <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+          <Loader2 className="h-3 w-3 animate-spin" /> Loading Google Calendar events…
+        </div>
+      )}
 
       <div className="flex gap-2 mb-3">
         {(["all", "upcoming", "past"] as const).map((s) => (
