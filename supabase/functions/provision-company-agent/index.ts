@@ -100,19 +100,13 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const ASSISTANT_TOOL_SECRET = Deno.env.get("ASSISTANT_TOOL_SECRET");
-    const INTERNAL_SECRET = SUPABASE_SERVICE_ROLE_KEY; // gate this function
 
     if (!ELEVENLABS_API_KEY) return json({ error: "ELEVENLABS_API_KEY not set" }, 500);
     if (!ASSISTANT_TOOL_SECRET) return json({ error: "ASSISTANT_TOOL_SECRET not set" }, 500);
 
-    // Internal-only: caller must present service role key
+    // Internal-only: caller must present the shared assistant secret
     const provided = req.headers.get("x-internal-secret");
-    console.log(
-      "auth check: providedLen=", provided?.length,
-      "expectedLen=", INTERNAL_SECRET?.length,
-      "match=", provided === INTERNAL_SECRET,
-    );
-    if (provided !== INTERNAL_SECRET) {
+    if (provided !== ASSISTANT_TOOL_SECRET) {
       return json({ error: "Unauthorized" }, 401);
     }
 

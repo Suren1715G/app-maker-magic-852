@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const ASSISTANT_TOOL_SECRET = Deno.env.get("ASSISTANT_TOOL_SECRET");
 
     if (!ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not configured");
 
@@ -90,7 +91,7 @@ Deno.serve(async (req) => {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  "x-internal-secret": SUPABASE_SERVICE_ROLE_KEY,
+                  "x-internal-secret": ASSISTANT_TOOL_SECRET ?? "",
                   Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
                 },
                 body: JSON.stringify({ company_id: profile.company_id }),
