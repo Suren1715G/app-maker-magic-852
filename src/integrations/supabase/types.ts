@@ -314,6 +314,92 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          daily_summary: boolean
+          email: boolean
+          missed_call: boolean
+          new_lead: boolean
+          new_review: boolean
+          new_sms: boolean
+          push: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_summary?: boolean
+          email?: boolean
+          missed_call?: boolean
+          new_lead?: boolean
+          new_review?: boolean
+          new_sms?: boolean
+          push?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_summary?: boolean
+          email?: boolean
+          missed_call?: boolean
+          new_lead?: boolean
+          new_review?: boolean
+          new_sms?: boolean
+          push?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          company_id: string
+          created_at: string
+          id: string
+          link: string | null
+          metadata: Json | null
+          read: boolean
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string | null
+        }
+        Insert: {
+          body?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          link?: string | null
+          metadata?: Json | null
+          read?: boolean
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id?: string | null
+        }
+        Update: {
+          body?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          link?: string | null
+          metadata?: Json | null
+          read?: boolean
+          title?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           business_name: string | null
@@ -536,6 +622,15 @@ export type Database = {
     Enums: {
       app_role: "admin" | "company_admin"
       call_source: "elevenlabs" | "twilio" | "manual"
+      notification_type:
+        | "lead"
+        | "booking"
+        | "missed"
+        | "review"
+        | "summary"
+        | "sms"
+        | "note"
+        | "system"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -665,6 +760,16 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "company_admin"],
       call_source: ["elevenlabs", "twilio", "manual"],
+      notification_type: [
+        "lead",
+        "booking",
+        "missed",
+        "review",
+        "summary",
+        "sms",
+        "note",
+        "system",
+      ],
     },
   },
 } as const
