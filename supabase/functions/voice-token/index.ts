@@ -82,6 +82,23 @@ Deno.serve(async (req) => {
 
           if (agentRow?.agent_id) {
             agentId = agentRow.agent_id;
+            // Fire-and-forget: ensure the agent is upgraded with the latest
+            // lookup tool + company context. Idempotent — safe to call repeatedly.
+            try {
+              await fetch(
+                `${SUPABASE_URL}/functions/v1/provision-company-agent`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "x-internal-secret": ASSISTANT_TOOL_SECRET ?? "",
+                  },
+                  body: JSON.stringify({ company_id: profile.company_id }),
+                },
+              );
+            } catch (e) {
+              console.error("Agent upgrade check failed:", e);
+            }
           } else {
             // Auto-provision a fresh agent for this company
             console.log("Provisioning agent for company", profile.company_id);
