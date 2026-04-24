@@ -46,7 +46,10 @@ export type ClickResult = {
   candidates?: string[];
 };
 
-export function clickByLabel(label: string, opts?: { allowDestructive?: boolean }): ClickResult {
+export function clickByLabel(
+  label: string,
+  opts?: { allowDestructive?: boolean; dryRun?: boolean },
+): ClickResult {
   if (!label || typeof document === "undefined") {
     return { ok: false, reason: "No label provided" };
   }
@@ -76,8 +79,10 @@ export function clickByLabel(label: string, opts?: { allowDestructive?: boolean 
     };
   }
 
-  (best.el as HTMLElement).scrollIntoView({ block: "center", behavior: "smooth" });
-  (best.el as HTMLElement).click();
+  if (!opts?.dryRun) {
+    (best.el as HTMLElement).scrollIntoView({ block: "center", behavior: "smooth" });
+    (best.el as HTMLElement).click();
+  }
   return { ok: true, matched: best.label.trim().slice(0, 80), destructive: isDestructive };
 }
 
