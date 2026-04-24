@@ -107,6 +107,11 @@ Deno.serve(async (req) => {
 
     // Internal-only: caller must present service role key
     const provided = req.headers.get("x-internal-secret");
+    console.log(
+      "auth check: providedLen=", provided?.length,
+      "expectedLen=", INTERNAL_SECRET?.length,
+      "match=", provided === INTERNAL_SECRET,
+    );
     if (provided !== INTERNAL_SECRET) {
       return json({ error: "Unauthorized" }, 401);
     }
