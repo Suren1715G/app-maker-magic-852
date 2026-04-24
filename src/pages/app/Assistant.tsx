@@ -181,7 +181,7 @@ const Assistant = () => {
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask Jarvis anything…"
+              placeholder="Ask about your business…"
               className="border-0 bg-transparent focus-visible:ring-0 px-0 h-9"
               disabled={busy}
             />
