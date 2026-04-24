@@ -1,26 +1,27 @@
 import { useState, useRef, useEffect } from "react";
-import { AppShell, PageHeader } from "@/components/app/AppShell";
+import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Bot, Send, Sparkles } from "lucide-react";
+import { Send, Sparkles, Zap } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { stats, weeklySeries, leads, reviews } from "@/data/mock";
+import { ReceptionistOrb } from "@/components/app/ReceptionistOrb";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/assistant-chat`;
 
 const suggestions = [
-  "How many leads did I get this week?",
-  "What's my close rate?",
-  "When are my best call hours?",
-  "Summarize today.",
+  { label: "Leads this week", q: "How many leads did I get this week?" },
+  { label: "Close rate", q: "What's my close rate?" },
+  { label: "Best call hours", q: "When are my best call hours?" },
+  { label: "Summarize today", q: "Summarize today." },
 ];
 
 const Assistant = () => {
   const [messages, setMessages] = useState<Msg[]>([
-    { role: "assistant", content: "Hi 👋 I'm your AI analyst. Ask me anything about your calls, bookings, leads, or reviews." },
+    { role: "assistant", content: "At your service. I'm **Jarvis** — your AI analyst. Ask me anything about your calls, bookings, leads, or reviews." },
   ]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
