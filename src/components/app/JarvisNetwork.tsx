@@ -2,6 +2,11 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 
+// Shared mutable level (0..1) read by the 3D scene each frame.
+// We pass this through props, then update via rAF in the parent — cheaper
+// than re-rendering React on every audio sample.
+export type LevelRef = { current: number };
+
 type Node = {
   pos: THREE.Vector3;
   color: string;
@@ -45,8 +50,10 @@ function NodeMesh({ node }: { node: Node }) {
   );
 }
 
-function Network() {
+function Network({ levelRef }: { levelRef?: LevelRef }) {
   const group = useRef<THREE.Group>(null);
+  // Smoothed level so the sphere doesn't jitter
+  const smoothed = useRef(0);
 
   const { nodes, lineGeom } = useMemo(() => {
     const RADIUS = 2.2;
@@ -92,8 +99,19 @@ function Network() {
 
   useFrame((_, dt) => {
     if (!group.current) return;
-    group.current.rotation.y += dt * 0.12;
-    group.current.rotation.x += dt * 0.04;
+    const target = levelRef?.current ?? 0;
+    // ease toward target — fast attack, slower release
+    const k = target > smoothed.current ? 0.35 : 0.12;
+    smoothed.current += (target - smoothed.current) * k;
+
+    // Pulse: 1.0 baseline, up to ~1.35 at full amplitude
+    const scale = 1 + smoothed.current * 0.35;
+    group.current.scale.setScalar(scale);
+
+    // Faster spin when speaking
+    const spin = 0.12 + smoothed.current * 0.4;
+    group.current.rotation.y += dt * spin;
+    group.current.rotation.x += dt * (0.04 + smoothed.current * 0.15);
   });
 
   return (
@@ -113,7 +131,7 @@ function Network() {
   );
 }
 
-export function JarvisNetwork() {
+export function JarvisNetwork({ levelRef }: { levelRef?: LevelRef }) {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
       <Canvas
@@ -124,7 +142,7 @@ export function JarvisNetwork() {
         <ambientLight intensity={0.5} />
         <pointLight position={[3, 3, 3]} intensity={1.2} color="#e879f9" />
         <pointLight position={[-3, -2, 2]} intensity={0.9} color="#fb923c" />
-        <Network />
+        <Network levelRef={levelRef} />
       </Canvas>
     </div>
   );
