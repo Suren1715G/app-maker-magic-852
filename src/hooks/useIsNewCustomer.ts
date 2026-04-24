@@ -1,13 +1,12 @@
 import { useDemoMode } from "@/contexts/DemoModeContext";
-import { useLocationCtx } from "@/contexts/LocationContext";
 
 /**
- * A "new customer" is a real (non-demo) account that hasn't set anything up
- * yet — represented today by having zero saved locations. They should see the
- * full app UI shells with empty data instead of the seeded mock dataset.
+ * A "new customer" is any real (non-demo) account. Real accounts should always
+ * see the full app UI shells with empty data instead of the seeded mock
+ * dataset — even after they've added their first location. Mock data is only
+ * for demo mode (admins previewing the customer experience).
  */
 export function useIsNewCustomer() {
   const { demoMode } = useDemoMode();
-  const { list } = useLocationCtx();
-  return !demoMode && list.length === 0;
+  return !demoMode;
 }
