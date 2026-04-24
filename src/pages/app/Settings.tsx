@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Zap, Monitor, Smartphone } from "lucide-react";
+import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Zap, Monitor, Smartphone, MapPin, Phone as PhoneIcon, Clock } from "lucide-react";
 import { sessions } from "@/data/mock";
 import { fmtRel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,20 @@ const Settings = () => {
   const [aiVoiceId, setAiVoiceId] = useState<string>(VOICE_OPTIONS[0].id);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [savingAi, setSavingAi] = useState(false);
+
+  // Locations (phone numbers per location, stored in company_phone_numbers)
+  type LocationRow = {
+    id: string;
+    label: string | null;
+    phone_number: string;
+    status: "pending" | "active" | "disabled";
+    created_at: string;
+  };
+  const [locations, setLocations] = useState<LocationRow[]>([]);
+  const [newLocLabel, setNewLocLabel] = useState("");
+  const [newLocPhone, setNewLocPhone] = useState("");
+  const [addingLoc, setAddingLoc] = useState(false);
+
   const [services, setServices] = useState(["Deep Clean", "Move-out Clean", "Office Clean", "Standard Clean"]);
   const [newSvc, setNewSvc] = useState("");
   const [darkMode, setDarkMode] = useState(true);
@@ -113,8 +127,61 @@ const Settings = () => {
       if (company?.ai_system_prompt) setAiPrompt(company.ai_system_prompt);
       if (company?.ai_first_message) setGreeting(company.ai_first_message);
       if (company?.ai_voice_id) setAiVoiceId(company.ai_voice_id);
+      await loadLocations(profile.company_id);
     })();
   }, [user]);
+
+  const loadLocations = async (cid: string) => {
+    const { data } = await supabase
+      .from("company_phone_numbers")
+      .select("id, label, phone_number, status, created_at")
+      .eq("company_id", cid)
+      .order("created_at", { ascending: true });
+    setLocations((data ?? []) as LocationRow[]);
+  };
+
+  const addLocation = async () => {
+    if (!companyId) {
+      toast.error("No company linked to your account");
+      return;
+    }
+    const label = newLocLabel.trim();
+    const number = newLocPhone.trim();
+    if (!label) return toast.error("Give the location a name");
+    if (!/^\+?[0-9 ()\-]{7,20}$/.test(number)) return toast.error("Enter a valid phone number");
+    setAddingLoc(true);
+    const { error } = await supabase.from("company_phone_numbers").insert({
+      company_id: companyId,
+      label,
+      phone_number: number,
+      provider: "twilio",
+      status: "pending",
+      requested_by: user?.id,
+    });
+    setAddingLoc(false);
+    if (error) {
+      if (error.message?.includes("duplicate")) {
+        toast.error("That phone number is already in use");
+      } else {
+        toast.error(error.message ?? "Could not add location");
+      }
+      return;
+    }
+    toast.success("Location requested — we'll activate it shortly");
+    setNewLocLabel("");
+    setNewLocPhone("");
+    await loadLocations(companyId);
+  };
+
+  const removePendingLocation = async (id: string) => {
+    const { error } = await supabase.from("company_phone_numbers").delete().eq("id", id);
+    if (error) {
+      toast.error("Could not remove — only pending locations can be deleted");
+      return;
+    }
+    toast.success("Location removed");
+    if (companyId) await loadLocations(companyId);
+  };
 
   const saveAi = async () => {
     if (!companyId) {
@@ -182,6 +249,74 @@ const Settings = () => {
             </div>
           </div>
         )}
+      </Section>
+
+      <Section title="Locations & phone numbers">
+        <div className="px-4 py-3 text-[11px] text-muted-foreground">
+          Add a phone number for each business location. New numbers stay <span className="text-foreground font-medium">pending</span> until our team activates routing — usually within 1 business day.
+        </div>
+        {locations.length > 0 && (
+          <ul className="px-4 pb-2 divide-y divide-border/60">
+            {locations.map((l) => {
+              const tone =
+                l.status === "active"
+                  ? "bg-success/15 text-success"
+                  : l.status === "pending"
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted text-muted-foreground";
+              const Icon = l.status === "pending" ? Clock : MapPin;
+              return (
+                <li key={l.id} className="py-3 flex items-center gap-3">
+                  <span className="h-9 w-9 rounded-full bg-card border border-border flex items-center justify-center shrink-0">
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{l.label ?? "Untitled location"}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">{l.phone_number}</div>
+                  </div>
+                  <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${tone}`}>
+                    {l.status}
+                  </span>
+                  {l.status === "pending" && (
+                    <button
+                      onClick={() => removePendingLocation(l.id)}
+                      className="text-muted-foreground hover:text-destructive ml-1"
+                      aria-label="Remove pending location"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="px-4 pb-3 grid sm:grid-cols-[1fr_1fr_auto] gap-2">
+          <div className="relative">
+            <MapPin className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={newLocLabel}
+              onChange={(e) => setNewLocLabel(e.target.value)}
+              placeholder="Location name"
+              className="h-9 pl-8"
+              maxLength={60}
+            />
+          </div>
+          <div className="relative">
+            <PhoneIcon className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={newLocPhone}
+              onChange={(e) => setNewLocPhone(e.target.value)}
+              placeholder="+1 555 123 4567"
+              className="h-9 pl-8"
+              maxLength={20}
+              inputMode="tel"
+            />
+          </div>
+          <Button size="sm" onClick={addLocation} disabled={addingLoc || !companyId}>
+            <Plus className="h-3.5 w-3.5" /> {addingLoc ? "Adding…" : "Add location"}
+          </Button>
+        </div>
       </Section>
 
       <Section title="AI receptionist">
