@@ -1,11 +1,24 @@
 import { AppShell } from "@/components/app/AppShell";
-import { calls, type CallTag } from "@/data/mock";
+import { type CallTag } from "@/data/mock";
 import { fmtDuration, fmtTime } from "@/lib/format";
 import { ArrowLeft, Bot, CalendarPlus, Phone, User, Tag } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+
+type LiveCall = {
+  id: string;
+  caller: string | null;
+  phone: string | null;
+  startedAt: string;
+  durationSec: number;
+  summary: string | null;
+  tag: CallTag | null;
+  recordingUrl: string | null;
+  transcript: { speaker: "AI" | "Caller"; text: string; at?: string }[];
+};
 
 const allTags: CallTag[] = ["lead", "booked", "follow-up", "spam"];
 const tagTone: Record<CallTag, string> = {
@@ -18,8 +31,60 @@ const tagTone: Record<CallTag, string> = {
 const CallDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const call = calls.find((c) => c.id === id);
-  const [tag, setTag] = useState<CallTag | undefined>(call?.tag);
+  const [call, setCall] = useState<LiveCall | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tag, setTag] = useState<CallTag | undefined>();
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("calls")
+        .select(
+          "id, caller, phone, started_at, duration_sec, summary, tag, recording_url, transcript",
+        )
+        .eq("id", id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (data) {
+        const live: LiveCall = {
+          id: data.id,
+          caller: data.caller,
+          phone: data.phone,
+          startedAt: data.started_at,
+          durationSec: data.duration_sec,
+          summary: data.summary,
+          tag: (data.tag as CallTag | null) ?? null,
+          recordingUrl: data.recording_url,
+          transcript: Array.isArray(data.transcript)
+            ? (data.transcript as LiveCall["transcript"])
+            : [],
+        };
+        setCall(live);
+        setTag(live.tag ?? undefined);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const persistTag = async (t: CallTag) => {
+    setTag(t);
+    const { error } = await supabase.from("calls").update({ tag: t }).eq("id", id!);
+    if (error) toast.error("Couldn't save tag");
+    else toast.success(`Tagged as ${t}`);
+  };
+
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="pt-10 text-center text-sm text-muted-foreground">Loading call…</div>
+      </AppShell>
+    );
+  }
 
   if (!call) {
     return (
@@ -42,7 +107,7 @@ const CallDetail = () => {
       </button>
 
       <header className="py-4">
-        <h1 className="font-display text-2xl font-semibold">{call.caller}</h1>
+        <h1 className="font-display text-2xl font-semibold">{call.caller ?? "Unknown caller"}</h1>
         <p className="text-sm text-muted-foreground">{call.phone} · {fmtTime(call.startedAt)} · {fmtDuration(call.durationSec)}</p>
       </header>
 
@@ -57,7 +122,7 @@ const CallDetail = () => {
 
       <div className="glass rounded-2xl p-4 mb-4">
         <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">AI summary</div>
-        <p className="text-sm leading-relaxed">{call.summary}</p>
+        <p className="text-sm leading-relaxed">{call.summary ?? "No summary yet."}</p>
       </div>
 
       <div className="glass rounded-2xl p-4 mb-4">
@@ -68,7 +133,7 @@ const CallDetail = () => {
           {allTags.map((t) => (
             <button
               key={t}
-              onClick={() => { setTag(t); toast.success(`Tagged as ${t}`); }}
+              onClick={() => persistTag(t)}
               className={cn(
                 "px-3 py-1 rounded-full text-xs font-medium border capitalize transition-colors",
                 tag === t ? tagTone[t] : "bg-card text-muted-foreground border-border hover:text-foreground"
@@ -96,6 +161,9 @@ const CallDetail = () => {
       </div>
 
       <h2 className="font-display text-lg font-semibold mb-3">Transcript</h2>
+      {call.transcript.length === 0 && (
+        <p className="text-sm text-muted-foreground mb-6">No transcript available for this call.</p>
+      )}
       <ul className="space-y-3">
         {call.transcript.map((t, i) => {
           const isAI = t.speaker === "AI";
