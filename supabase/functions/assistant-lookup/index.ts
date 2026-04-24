@@ -29,6 +29,10 @@ function startOfMonthUTC(): Date {
   return d;
 }
 
+function periodStart(period: string) {
+  return period === "week" ? startOfWeekUTC() : period === "month" ? startOfMonthUTC() : startOfTodayUTC();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -73,11 +77,11 @@ Deno.serve(async (req) => {
         return json({
           available: [
             { topic: "calls", actions: ["call_stats", "recent_calls", "search_calls"], note: "Real call records from the receptionist." },
+            { topic: "sms_messages", actions: ["message_stats", "recent_messages", "search_messages"], note: "Real SMS/text conversations stored for this company." },
             { topic: "leads", actions: ["leads_summary"], note: "Derived from calls tagged lead/booking/quote." },
             { topic: "business_info", actions: ["business_info"], note: "Company name + provisioned phone numbers." },
           ],
           not_yet_connected: [
-            { topic: "sms_messages", note: "SMS/text messaging is not yet wired to live data. The Messages page currently shows demo content. Tell the user honestly that message history isn't tracked yet, and offer to navigate them to /sms." },
             { topic: "reviews", note: "Reviews are not yet wired to live data. Page shows demo content. Offer to navigate to /reviews." },
             { topic: "calendar_appointments", note: "Calendar/appointments are not yet wired to live data. Offer to navigate to /calendar." },
             { topic: "notes_reminders", note: "Notes can be CREATED via perform_action(create_note) but cannot yet be listed/queried. Offer to navigate to /notes." },
@@ -103,12 +107,7 @@ Deno.serve(async (req) => {
 
       case "call_stats": {
         const period = String(body?.period ?? "today");
-        const since =
-          period === "week"
-            ? startOfWeekUTC()
-            : period === "month"
-              ? startOfMonthUTC()
-              : startOfTodayUTC();
+        const since = periodStart(period);
         const { data, error } = await admin
           .from("calls")
           .select("status, duration_sec, tag")
@@ -134,6 +133,62 @@ Deno.serve(async (req) => {
           total_duration_sec: totalDurationSec,
           average_duration_sec: avgDurationSec,
         });
+      }
+
+      case "message_stats": {
+        const period = String(body?.period ?? "today");
+        const since = periodStart(period);
+        const { data, error } = await admin
+          .from("sms_messages")
+          .select("direction, delivered, sent_at")
+          .eq("company_id", company_id)
+          .gte("sent_at", since.toISOString());
+        if (error) {
+          console.error("message_stats error", error);
+          return json({ error: "Database error" }, 500);
+        }
+        const messages = data ?? [];
+        return json({
+          period,
+          total: messages.length,
+          received: messages.filter((m) => m.direction === "inbound").length,
+          sent: messages.filter((m) => m.direction === "outbound").length,
+          delivered: messages.filter((m) => m.delivered).length,
+          undelivered: messages.filter((m) => !m.delivered).length,
+        });
+      }
+
+      case "recent_messages": {
+        const limit = Math.min(Math.max(Number(body?.limit ?? 10), 1), 30);
+        const { data, error } = await admin
+          .from("sms_messages")
+          .select("direction, body, delivered, sent_at, sms_threads(customer, phone)")
+          .eq("company_id", company_id)
+          .order("sent_at", { ascending: false })
+          .limit(limit);
+        if (error) {
+          console.error("recent_messages error", error);
+          return json({ error: "Database error" }, 500);
+        }
+        return json({ messages: data ?? [] });
+      }
+
+      case "search_messages": {
+        const query = String(body?.query ?? "").trim();
+        if (!query) return json({ error: "query is required" }, 400);
+        const escaped = query.replace(/[%_]/g, "");
+        const { data, error } = await admin
+          .from("sms_messages")
+          .select("direction, body, delivered, sent_at, sms_threads(customer, phone)")
+          .eq("company_id", company_id)
+          .ilike("body", `%${escaped}%`)
+          .order("sent_at", { ascending: false })
+          .limit(20);
+        if (error) {
+          console.error("search_messages error", error);
+          return json({ error: "Database error" }, 500);
+        }
+        return json({ messages: data ?? [] });
       }
 
       case "recent_calls": {
