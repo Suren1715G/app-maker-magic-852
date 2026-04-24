@@ -295,7 +295,7 @@ export function ReceptionistWidget() {
       {/* Floating launcher */}
       <button
         onClick={() => setOpen((o) => !o)}
-        aria-label="Open AI receptionist"
+        aria-label="Open Jarvis"
         className={cn(
           "fixed bottom-24 right-4 z-40 h-12 w-12 rounded-full shadow-lg",
           "bg-gradient-to-br from-primary to-accent text-primary-foreground",
