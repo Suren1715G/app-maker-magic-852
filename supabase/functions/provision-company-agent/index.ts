@@ -137,12 +137,88 @@ function buildActionTool(supabaseUrl: string, secret: string, companyId: string)
   };
 }
 
+function buildClientTools() {
+  return [
+    {
+      type: "client",
+      name: "get_current_screen",
+      description: "Read the user's current app screen. Use before claiming you can or cannot see a control.",
+      expects_response: true,
+      response_timeout_secs: 20,
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+    {
+      type: "client",
+      name: "list_actions",
+      description: "List all visible clickable controls, tabs, links, switches, and input fields on the current screen. Always use before saying a control is missing.",
+      expects_response: true,
+      response_timeout_secs: 20,
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+    {
+      type: "client",
+      name: "navigate_to",
+      description: "Navigate inside the app to a known page such as settings, notifications, calls, calendar, sms, leads, reviews, analytics, billing, referrals, support, assistant, or home.",
+      expects_response: true,
+      response_timeout_secs: 20,
+      parameters: {
+        type: "object",
+        required: ["destination"],
+        properties: { destination: { type: "string", description: "The destination page name." } },
+      },
+    },
+    {
+      type: "client",
+      name: "click_element",
+      description: "Click a visible button, link, tab, checkbox, or switch by its visible label/aria-label. Must be called with confirmed=false first, then confirmed=true only after the user says yes.",
+      expects_response: true,
+      response_timeout_secs: 20,
+      parameters: {
+        type: "object",
+        required: ["label", "confirmed"],
+        properties: {
+          label: { type: "string", description: "Visible label of the element to click." },
+          confirmed: { type: "boolean", description: "false for preview; true only after user confirmation." },
+        },
+      },
+    },
+    {
+      type: "client",
+      name: "fill_field",
+      description: "Fill a visible input or textarea by label/placeholder. Must be called with confirmed=false first, then confirmed=true after the user says yes.",
+      expects_response: true,
+      response_timeout_secs: 20,
+      parameters: {
+        type: "object",
+        required: ["label", "value", "confirmed"],
+        properties: {
+          label: { type: "string", description: "Visible field label or placeholder." },
+          value: { type: "string", description: "Text/value to type." },
+          confirmed: { type: "boolean", description: "false for preview; true only after user confirmation." },
+        },
+      },
+    },
+    {
+      type: "client",
+      name: "open_location_request_form",
+      description: "Use this when the user asks to request/add a new location. It visibly navigates to Settings and clicks the real 'Request a new location' button. Must be called with confirmed=false first, then confirmed=true after user confirmation. Never claim the form is open unless this tool returns success.",
+      expects_response: true,
+      response_timeout_secs: 30,
+      parameters: {
+        type: "object",
+        required: ["confirmed"],
+        properties: { confirmed: { type: "boolean", description: "false for preview; true only after user confirmation." } },
+      },
+    },
+  ];
+}
+
 function injectCompanyContext(
   baseSystemPrompt: string | undefined,
   companyName: string,
   companyId: string,
 ) {
-  const block = `\n\n---\nYou are the AI receptionist and assistant for "${companyName}".\n\nYou have two tools:\n1. lookup_business_data — read-only queries about this company's calls, leads, business info. Use freely.\n2. perform_action — make changes (tag a call, send SMS, create note/reminder, request phone/location). ALWAYS use confirm-first flow: call with confirmed=false to get a preview, read the preview to the user, get verbal "yes", then call again with confirmed=true. Never skip the confirmation.\n\nWhen the user asks about their calls, leads, customers, missed calls, recent activity, phone numbers, or any business information — use lookup_business_data. Do NOT make up numbers.\n\nWhen the user asks you to do something (send a text, tag a call, remind me, add a location, request a number) — use perform_action with confirmed=false first.\n\nAlways pass company_id="${companyId}" exactly as-is to both tools.\n---\n`;
+  const block = `\n\n---\nYou are the AI receptionist and assistant for "${companyName}".\n\nUse tools to do real work. NEVER say you clicked, opened, submitted, toggled, sent, or completed something unless a tool returned success.\n\nYou have server tools for business data and server-only actions, plus client tools for controlling the visible app screen.\n\nWhen the user asks about calls, leads, customers, missed calls, recent activity, phone numbers, or business information — use lookup_business_data. Do NOT make up numbers.\n\nWhen the user asks to control the app UI (click, toggle, switch off/on, open, fill, save, submit, change a setting), use the client tools. First use list_actions if unsure, then click_element/fill_field with confirmed=false, get verbal yes, then confirmed=true. Toggle switches such as Push notifications and Dark mode are clickable elements.\n\nFor requesting/adding a new location: NEVER use perform_action and NEVER just say you are doing it. Use open_location_request_form with confirmed=false, get yes, call it with confirmed=true, then ask for the field values and fill the real on-screen form. Only after click_element('Send request', confirmed=true) succeeds may you say the request was submitted.\n\nUse perform_action only for actions without an on-screen form: tag a call, send SMS, create note/reminder. Always confirm first.\n\nAlways pass company_id="${companyId}" exactly as-is to server tools.\n---\n`;
   return (baseSystemPrompt ?? "") + block;
 }
 
