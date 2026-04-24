@@ -9,9 +9,14 @@ import {
   Loader2,
   MessageSquare,
   Phone,
+  Plus,
+  Trash2,
   User,
 } from "lucide-react";
 import { calls, bookings, sms } from "@/data/mock";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 type Detail = {
   id: string;
@@ -33,10 +38,21 @@ type Detail = {
   }[];
 };
 
+type PhoneRow = {
+  id: string;
+  label: string | null;
+  phone_number: string;
+  status: "pending" | "active" | "disabled";
+  created_at: string;
+};
+
 const MasterCompanyDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<Detail | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [phones, setPhones] = useState<PhoneRow[]>([]);
+  const [newLabel, setNewLabel] = useState("");
+  const [newPhone, setNewPhone] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -53,8 +69,52 @@ const MasterCompanyDetail = () => {
         return;
       }
       setData(row as Detail);
+      await loadPhones(row.id);
     })();
   }, [id]);
+
+  const loadPhones = async (cid: string) => {
+    const { data } = await supabase
+      .from("company_phone_numbers")
+      .select("id, label, phone_number, status, created_at")
+      .eq("company_id", cid)
+      .order("created_at", { ascending: true });
+    setPhones((data ?? []) as PhoneRow[]);
+  };
+
+  const setStatus = async (pid: string, status: PhoneRow["status"]) => {
+    const { error } = await supabase
+      .from("company_phone_numbers")
+      .update({ status })
+      .eq("id", pid);
+    if (error) return toast.error(error.message);
+    toast.success(`Marked ${status}`);
+    if (id) await loadPhones(id);
+  };
+
+  const adminAddPhone = async () => {
+    if (!id) return;
+    if (!newPhone.trim()) return toast.error("Phone required");
+    const { error } = await supabase.from("company_phone_numbers").insert({
+      company_id: id,
+      label: newLabel.trim() || null,
+      phone_number: newPhone.trim(),
+      provider: "twilio",
+      status: "active",
+    });
+    if (error) return toast.error(error.message);
+    toast.success("Phone added");
+    setNewLabel("");
+    setNewPhone("");
+    await loadPhones(id);
+  };
+
+  const adminDeletePhone = async (pid: string) => {
+    const { error } = await supabase.from("company_phone_numbers").delete().eq("id", pid);
+    if (error) return toast.error(error.message);
+    toast.success("Removed");
+    if (id) await loadPhones(id);
+  };
 
   // Note: live customer data lives in the company's own tables which we haven't
   // built yet (calls/bookings/sms are still mock for the customer dashboard).
@@ -149,6 +209,78 @@ const MasterCompanyDetail = () => {
                   </li>
                 ))}
               </ul>
+            </section>
+
+            <section className="glass rounded-2xl p-5">
+              <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5" /> Phone numbers ({phones.length})
+              </h2>
+              {phones.length === 0 && (
+                <p className="text-sm text-muted-foreground mb-3">No numbers yet.</p>
+              )}
+              <ul className="space-y-2 mb-3">
+                {phones.map((p) => {
+                  const tone =
+                    p.status === "active"
+                      ? "bg-success/15 text-success"
+                      : p.status === "pending"
+                        ? "bg-primary/15 text-primary"
+                        : "bg-muted text-muted-foreground";
+                  return (
+                    <li key={p.id} className="flex items-center gap-2 text-sm">
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate font-medium">{p.label ?? "Untitled"}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">{p.phone_number}</div>
+                      </div>
+                      <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full shrink-0 ${tone}`}>
+                        {p.status}
+                      </span>
+                      {p.status !== "active" && (
+                        <button
+                          onClick={() => setStatus(p.id, "active")}
+                          className="text-[10px] text-success hover:underline"
+                        >
+                          Activate
+                        </button>
+                      )}
+                      {p.status === "active" && (
+                        <button
+                          onClick={() => setStatus(p.id, "disabled")}
+                          className="text-[10px] text-muted-foreground hover:underline"
+                        >
+                          Disable
+                        </button>
+                      )}
+                      <button
+                        onClick={() => adminDeletePhone(p.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                        aria-label="Delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="space-y-2">
+                <Input
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  placeholder="Location label"
+                  className="h-9"
+                />
+                <div className="flex gap-2">
+                  <Input
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    placeholder="+1 555 123 4567"
+                    className="h-9 flex-1"
+                  />
+                  <Button size="sm" onClick={adminAddPhone}>
+                    <Plus className="h-3.5 w-3.5" /> Add
+                  </Button>
+                </div>
+              </div>
             </section>
           </div>
 
