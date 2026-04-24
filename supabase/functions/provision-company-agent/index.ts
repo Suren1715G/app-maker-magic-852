@@ -106,11 +106,9 @@ function buildActionTool(supabaseUrl: string, secret: string, companyId: string)
               "tag_call",
               "send_sms",
               "create_note",
-              "create_phone_request",
-              "create_location_request",
             ],
             description:
-              "Which action to perform. tag_call (needs call_id, tag); send_sms (needs to, message); create_note (needs title; optional body, due_at ISO datetime); create_phone_request (needs label); create_location_request (needs location_name; optional locations_wanted, note).",
+              "Which action to perform. tag_call (needs call_id, tag); send_sms (needs to, message); create_note (needs title; optional body, due_at ISO datetime). For requesting a new LOCATION or new PHONE NUMBER, do NOT use this tool — walk the user through the form on /settings using navigate_to + click_element + fill_field.",
           },
           confirmed: {
             type: "boolean",
