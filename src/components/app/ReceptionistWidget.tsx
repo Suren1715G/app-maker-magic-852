@@ -198,7 +198,7 @@ export function ReceptionistWidget() {
 
       // Preview pass — find target without clicking.
       if (!confirmed) {
-        const probe = clickByLabel(label, { allowDestructive: true });
+        const probe = clickByLabel(label, { allowDestructive: true, dryRun: true });
         if (!probe.ok) {
           return `Could not find "${label}". ${probe.reason}${
             probe.candidates?.length
