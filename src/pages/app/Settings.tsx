@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { getStoredTheme, setTheme } from "@/lib/theme";
 
 const VOICE_OPTIONS: { id: string; label: string }[] = [
   { id: "wDsJlOXPqcvIUKdLXjDs", label: "Jarvis · British robotic monotone" },
@@ -63,7 +64,7 @@ const Settings = () => {
 
   const [services, setServices] = useState(["Deep Clean", "Move-out Clean", "Office Clean", "Standard Clean"]);
   const [newSvc, setNewSvc] = useState("");
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => getStoredTheme() === "dark");
   const [logo, setLogo] = useState<string | null>(null);
 
   // Notifications
