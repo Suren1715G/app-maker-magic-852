@@ -16,6 +16,31 @@ const ALLOWED_VOICES = new Set<string>([
   "tnSpp4vdxKPjI9w0GnoV", // Hope
 ]);
 
+// Build a short business-hours instruction block to splice into the system
+// prompt. The AI gets told what the hours are, what timezone they're in,
+// and how to behave after hours (polite decline + callback promise).
+function buildHoursPrompt(opts: {
+  alwaysOn: boolean;
+  open: string | null;
+  close: string | null;
+  timezone: string | null;
+  companyName: string | null;
+}): string {
+  const tz = opts.timezone || "America/New_York";
+  if (opts.alwaysOn || !opts.open || !opts.close) {
+    return `BUSINESS HOURS: This business is open 24/7. Always answer normally regardless of time.`;
+  }
+  const open = String(opts.open).slice(0, 5);
+  const close = String(opts.close).slice(0, 5);
+  return [
+    `BUSINESS HOURS:`,
+    `- Open daily ${open}–${close} (${tz}).`,
+    `- Before answering, silently check the current time in ${tz}.`,
+    `- If the call is INSIDE business hours: answer normally and help the caller.`,
+    `- If the call is OUTSIDE business hours: be brief and polite. Say something like "Thanks for calling${opts.companyName ? ` ${opts.companyName}` : ""}. We're currently closed — our hours are ${open} to ${close}. I'll make sure someone calls you back first thing when we're open. Can I get your name and a good number to reach you?" Take their name + number, then end the call warmly. Do NOT book appointments or quote prices outside hours.`,
+  ].join("\n");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -49,10 +74,12 @@ Deno.serve(async (req) => {
     }
     const userId = claimsData.claims.sub as string;
 
-    // 2. Validate input
+    // 2. Validate input. `voice_id` is optional now — when omitted we just
+    //    re-sync hours/system-prompt using whatever's already in the DB.
     const body = await req.json().catch(() => ({}));
-    const voiceId = typeof body?.voice_id === "string" ? body.voice_id.trim() : "";
-    if (!voiceId || !ALLOWED_VOICES.has(voiceId)) {
+    const rawVoice = typeof body?.voice_id === "string" ? body.voice_id.trim() : "";
+    const voiceId = rawVoice || null;
+    if (voiceId && !ALLOWED_VOICES.has(voiceId)) {
       return new Response(JSON.stringify({ error: "Invalid voice_id" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -94,32 +121,78 @@ Deno.serve(async (req) => {
       .eq("company_id", profile.company_id)
       .maybeSingle();
 
-    // 6. Persist voice choice in DB no matter what (so the UI reflects it)
-    const { error: updateErr } = await admin
-      .from("companies")
-      .update({ ai_voice_id: voiceId })
-      .eq("id", profile.company_id);
-    if (updateErr) {
-      console.error("DB update failed:", updateErr);
-      return new Response(JSON.stringify({ error: "Could not save voice" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // 6. Persist voice choice in DB if a new one was provided.
+    if (voiceId) {
+      const { error: updateErr } = await admin
+        .from("companies")
+        .update({ ai_voice_id: voiceId })
+        .eq("id", profile.company_id);
+      if (updateErr) {
+        console.error("DB update failed:", updateErr);
+        return new Response(JSON.stringify({ error: "Could not save voice" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
-    // 7. If there's no agent linked, we still saved the preference — just tell the client.
+    // 7. Load current company settings so we can also push hours to the agent.
+    const { data: company } = await admin
+      .from("companies")
+      .select("name, ai_voice_id, ai_system_prompt, business_hours_always_on, business_hours_open, business_hours_close, business_hours_timezone")
+      .eq("id", profile.company_id)
+      .maybeSingle();
+
+    // 8. If there's no agent linked, we still saved the preference — just tell the client.
     if (!agentRow?.agent_id) {
       return new Response(
         JSON.stringify({
           ok: true,
           synced: false,
-          message: "Voice saved. No live agent linked yet — your account manager will apply it during setup.",
+          message: voiceId
+            ? "Voice saved. No live agent linked yet — your account manager will apply it during setup."
+            : "Saved. No live agent linked yet — your account manager will apply it during setup.",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // 8. Push voice to ElevenLabs
+    // 9. Build the agent payload: voice (if any) + a fresh system prompt with
+    //    a business-hours block appended/replaced.
+    const effectiveVoice = voiceId ?? company?.ai_voice_id ?? null;
+    const hoursBlock = buildHoursPrompt({
+      alwaysOn: company?.business_hours_always_on ?? true,
+      open: company?.business_hours_open ?? null,
+      close: company?.business_hours_close ?? null,
+      timezone: company?.business_hours_timezone ?? null,
+      companyName: company?.name ?? null,
+    });
+    // Strip any previous hours block (delimited by markers) so we don't keep
+    // appending duplicates each time we re-sync.
+    const HOURS_START = "<!-- HOURS:START -->";
+    const HOURS_END = "<!-- HOURS:END -->";
+    const basePrompt = (company?.ai_system_prompt ?? "")
+      .replace(new RegExp(`${HOURS_START}[\\s\\S]*?${HOURS_END}`, "g"), "")
+      .trim();
+    const newPrompt = `${basePrompt}\n\n${HOURS_START}\n${hoursBlock}\n${HOURS_END}`.trim();
+
+    const conversationConfig: Record<string, unknown> = {
+      agent: {
+        prompt: { prompt: newPrompt },
+      },
+    };
+    if (effectiveVoice) {
+      conversationConfig.tts = { voice_id: effectiveVoice };
+    }
+
+    // Persist the updated system prompt locally too, so the next sync picks
+    // up from the same baseline.
+    await admin
+      .from("companies")
+      .update({ ai_system_prompt: newPrompt })
+      .eq("id", profile.company_id);
+
+    // 10. Push to ElevenLabs
     const elResp = await fetch(
       `https://api.elevenlabs.io/v1/convai/agents/${agentRow.agent_id}`,
       {
@@ -128,11 +201,7 @@ Deno.serve(async (req) => {
           "xi-api-key": ELEVENLABS_API_KEY,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          conversation_config: {
-            tts: { voice_id: voiceId },
-          },
-        }),
+        body: JSON.stringify({ conversation_config: conversationConfig }),
       },
     );
 
@@ -145,7 +214,7 @@ Deno.serve(async (req) => {
           error:
             elResp.status === 404
               ? "Linked agent not found in ElevenLabs."
-              : "Voice was saved but couldn't sync to the live agent. Try again shortly.",
+              : "Saved, but couldn't sync to the live agent. Try again shortly.",
         }),
         {
           status: 502,

@@ -128,6 +128,10 @@ export type Database = {
           ai_first_message: string | null
           ai_system_prompt: string | null
           ai_voice_id: string | null
+          business_hours_always_on: boolean
+          business_hours_close: string
+          business_hours_open: string
+          business_hours_timezone: string
           created_at: string
           id: string
           name: string
@@ -137,6 +141,10 @@ export type Database = {
           ai_first_message?: string | null
           ai_system_prompt?: string | null
           ai_voice_id?: string | null
+          business_hours_always_on?: boolean
+          business_hours_close?: string
+          business_hours_open?: string
+          business_hours_timezone?: string
           created_at?: string
           id?: string
           name: string
@@ -146,6 +154,10 @@ export type Database = {
           ai_first_message?: string | null
           ai_system_prompt?: string | null
           ai_voice_id?: string | null
+          business_hours_always_on?: boolean
+          business_hours_close?: string
+          business_hours_open?: string
+          business_hours_timezone?: string
           created_at?: string
           id?: string
           name?: string

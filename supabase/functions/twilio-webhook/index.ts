@@ -17,6 +17,41 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Returns true if the given moment falls inside [open, close) in the given
+// IANA timezone. Same-day window only (e.g. 08:00 → 18:00, not overnight).
+function isInsideBusinessHours(opts: {
+  at: Date;
+  open: string; // "HH:MM" or "HH:MM:SS"
+  close: string;
+  timezone: string;
+}): boolean {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: opts.timezone,
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const parts = fmt.formatToParts(opts.at);
+    const hh = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+    const mm = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+    const nowMin = hh * 60 + mm;
+    const [oH, oM] = opts.open.split(":").map(Number);
+    const [cH, cM] = opts.close.split(":").map(Number);
+    const openMin = oH * 60 + (oM || 0);
+    const closeMin = cH * 60 + (cM || 0);
+    if (closeMin <= openMin) {
+      // Overnight window (e.g. 22:00 → 06:00) — true if before close OR after open.
+      return nowMin >= openMin || nowMin < closeMin;
+    }
+    return nowMin >= openMin && nowMin < closeMin;
+  } catch (_e) {
+    // If anything blows up (bad timezone string, etc.), default to "open"
+    // rather than dropping the call.
+    return true;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -134,6 +169,24 @@ Deno.serve(async (req) => {
       status = "missed-followup";
     }
 
+    // Tag after-hours calls so they're filterable in the dashboard.
+    let tag: string | null = null;
+    if (direction.startsWith("inbound")) {
+      const { data: company } = await supabase
+        .from("companies")
+        .select("business_hours_always_on, business_hours_open, business_hours_close, business_hours_timezone")
+        .eq("id", mapping.company_id)
+        .maybeSingle();
+      if (company && company.business_hours_always_on === false) {
+        const open = company.business_hours_open ? String(company.business_hours_open) : "08:00";
+        const close = company.business_hours_close ? String(company.business_hours_close) : "18:00";
+        const tz = company.business_hours_timezone || "America/New_York";
+        const callAt = params.Timestamp ? new Date(params.Timestamp) : new Date();
+        const inside = isInsideBusinessHours({ at: callAt, open, close, timezone: tz });
+        if (!inside) tag = "after-hours";
+      }
+    }
+
     const { error } = await supabase.from("calls").upsert(
       {
         company_id: mapping.company_id,
@@ -144,9 +197,10 @@ Deno.serve(async (req) => {
         direction,
         status,
         duration_sec: duration,
+        tag,
         summary: `${direction === "inbound" ? "Incoming" : "Outgoing"} call ${
           status === "missed-followup" ? "(missed)" : "completed"
-        }.`,
+        }${tag === "after-hours" ? " · after hours" : ""}.`,
         recording_url: recordingUrl,
         metadata: { twilio: params },
         started_at: params.Timestamp

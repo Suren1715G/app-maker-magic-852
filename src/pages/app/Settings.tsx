@@ -21,14 +21,41 @@ const VOICE_OPTIONS: { id: string; label: string }[] = [
 ];
 const DEFAULT_VOICE_ID = VOICE_OPTIONS[0].id;
 
+// Common US/global timezones — owners pick the one their business runs on.
+const TIMEZONE_OPTIONS: { id: string; label: string }[] = [
+  { id: "America/New_York", label: "Eastern (ET) — New York, Atlanta, Miami" },
+  { id: "America/Chicago", label: "Central (CT) — Chicago, Dallas, Houston" },
+  { id: "America/Denver", label: "Mountain (MT) — Denver, Salt Lake City" },
+  { id: "America/Phoenix", label: "Arizona (MST, no DST) — Phoenix" },
+  { id: "America/Los_Angeles", label: "Pacific (PT) — LA, Seattle, San Francisco" },
+  { id: "America/Anchorage", label: "Alaska (AKT)" },
+  { id: "Pacific/Honolulu", label: "Hawaii (HST)" },
+  { id: "America/Toronto", label: "Eastern Canada — Toronto, Montreal" },
+  { id: "America/Vancouver", label: "Pacific Canada — Vancouver" },
+  { id: "Europe/London", label: "United Kingdom (GMT/BST)" },
+  { id: "Europe/Dublin", label: "Ireland (GMT/IST)" },
+  { id: "Europe/Paris", label: "Central Europe (CET) — Paris, Berlin, Madrid" },
+  { id: "Europe/Athens", label: "Eastern Europe (EET) — Athens, Helsinki" },
+  { id: "Asia/Dubai", label: "Gulf (GST) — Dubai" },
+  { id: "Asia/Kolkata", label: "India (IST)" },
+  { id: "Asia/Singapore", label: "Singapore / Hong Kong" },
+  { id: "Asia/Tokyo", label: "Japan (JST)" },
+  { id: "Australia/Sydney", label: "Australia East — Sydney, Melbourne" },
+];
+const DEFAULT_TIMEZONE = "America/New_York";
+
 const Settings = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
-  const [phone, setPhone] = useState("+1 (844) 790-5754");
+  // Live phone number from company_phone_numbers (read-only — provisioned by ops)
+  const [phone, setPhone] = useState<string>("");
   const [alwaysOn, setAlwaysOn] = useState(true);
   const [openTime, setOpenTime] = useState("08:00");
   const [closeTime, setCloseTime] = useState("18:00");
+  const [timezone, setTimezone] = useState<string>(DEFAULT_TIMEZONE);
+  const [hoursLoaded, setHoursLoaded] = useState(false);
+  const [savingHours, setSavingHours] = useState(false);
   const [aiVoiceId, setAiVoiceId] = useState<string>(DEFAULT_VOICE_ID);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [savingAi, setSavingAi] = useState(false);
@@ -143,18 +170,56 @@ const Settings = () => {
       setCompanyId(profile.company_id);
       const { data: company } = await supabase
         .from("companies")
-        .select("ai_voice_id")
+        .select("ai_voice_id, business_hours_always_on, business_hours_open, business_hours_close, business_hours_timezone")
         .eq("id", profile.company_id)
         .maybeSingle();
-      if (company?.ai_voice_id) {
-        // Only honor stored voice if it's still in our allowed list
-        const allowed = VOICE_OPTIONS.some((v) => v.id === company.ai_voice_id);
-        setAiVoiceId(allowed ? company.ai_voice_id : DEFAULT_VOICE_ID);
+      if (company) {
+        if (company.ai_voice_id) {
+          // Only honor stored voice if it's still in our allowed list
+          const allowed = VOICE_OPTIONS.some((v) => v.id === company.ai_voice_id);
+          setAiVoiceId(allowed ? company.ai_voice_id : DEFAULT_VOICE_ID);
+        }
+        setAlwaysOn(company.business_hours_always_on ?? true);
+        // Postgres TIME comes back as "HH:MM:SS" — strip seconds for <input type="time">
+        if (company.business_hours_open) {
+          setOpenTime(String(company.business_hours_open).slice(0, 5));
+        }
+        if (company.business_hours_close) {
+          setCloseTime(String(company.business_hours_close).slice(0, 5));
+        }
+        setTimezone(company.business_hours_timezone || DEFAULT_TIMEZONE);
       }
+      setHoursLoaded(true);
       await loadLocations(profile.company_id);
       await loadRequests(profile.company_id);
     })();
   }, [user]);
+
+  // Auto-save business hours whenever they change (after the initial load).
+  useEffect(() => {
+    if (!hoursLoaded || !companyId) return;
+    const t = setTimeout(async () => {
+      setSavingHours(true);
+      const { error } = await supabase
+        .from("companies")
+        .update({
+          business_hours_always_on: alwaysOn,
+          business_hours_open: openTime,
+          business_hours_close: closeTime,
+          business_hours_timezone: timezone,
+        })
+        .eq("id", companyId);
+      setSavingHours(false);
+      if (error) {
+        toast.error("Couldn't save business hours");
+        return;
+      }
+      // Push to the live ElevenLabs agent so the AI knows about the change.
+      // Fire-and-forget; UI shouldn't block on it.
+      supabase.functions.invoke("update-elevenlabs-agent", { body: {} }).catch(() => {});
+    }, 600);
+    return () => clearTimeout(t);
+  }, [alwaysOn, openTime, closeTime, timezone, hoursLoaded, companyId]);
 
   const loadLocations = async (cid: string) => {
     const { data } = await supabase
@@ -162,7 +227,11 @@ const Settings = () => {
       .select("id, label, phone_number, status, created_at")
       .eq("company_id", cid)
       .order("created_at", { ascending: true });
-    setLocations((data ?? []) as LocationRow[]);
+    const rows = (data ?? []) as LocationRow[];
+    setLocations(rows);
+    // Phone shown in Business section = first active number, else first pending, else blank.
+    const active = rows.find((r) => r.status === "active") ?? rows[0];
+    if (active) setPhone(active.phone_number);
   };
 
   const loadRequests = async (cid: string) => {
@@ -251,7 +320,17 @@ const Settings = () => {
       )}
 
       <Section title="Business">
-        <Field label="Phone number" value={phone} onChange={setPhone} />
+        <div className="px-4 py-3">
+          <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+            <PhoneIcon className="h-3 w-3" /> Phone number
+          </div>
+          <div className="h-9 rounded-md bg-input border border-border px-3 flex items-center text-sm font-medium">
+            {phone || <span className="text-muted-foreground font-normal">No number assigned yet</span>}
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-1.5">
+            Your live AI receptionist number. To change it, contact Support.
+          </div>
+        </div>
         <Toggle
           label="Always on (24/7)"
           hint="AI answers around the clock"
@@ -259,15 +338,39 @@ const Settings = () => {
           onChange={setAlwaysOn}
         />
         {!alwaysOn && (
-          <div className="px-4 py-3 grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-xs text-muted-foreground mb-1">Opens</div>
-              <Input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="h-9 bg-input" />
+          <>
+            <div className="px-4 py-3 grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Opens</div>
+                <Input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="h-9 bg-input" />
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Closes</div>
+                <Input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="h-9 bg-input" />
+              </div>
             </div>
-            <div>
-              <div className="text-xs text-muted-foreground mb-1">Closes</div>
-              <Input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="h-9 bg-input" />
+            <div className="px-4 py-3">
+              <div className="text-xs text-muted-foreground mb-1">Timezone</div>
+              <select
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                aria-label="Business timezone"
+                className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {TIMEZONE_OPTIONS.map((t) => (
+                  <option key={t.id} value={t.id}>{t.label}</option>
+                ))}
+              </select>
+              <div className="text-[10px] text-muted-foreground mt-1.5">
+                After hours, the AI politely tells callers you're closed and promises a callback.
+                {savingHours ? " · Saving…" : hoursLoaded ? " · Saved ✓" : ""}
+              </div>
             </div>
+          </>
+        )}
+        {alwaysOn && hoursLoaded && (
+          <div className="px-4 py-2.5 text-[10px] text-muted-foreground">
+            {savingHours ? "Saving…" : "Saved ✓"}
           </div>
         )}
       </Section>
