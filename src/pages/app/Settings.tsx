@@ -104,6 +104,57 @@ const Settings = () => {
   const [notifMissed, setNotifMissed] = useState(true);
   const [notifDaily, setNotifDaily] = useState(true);
   const [notifWeekly, setNotifWeekly] = useState(false);
+  const [notifEmail, setNotifEmail] = useState(true);
+  const [notifLoaded, setNotifLoaded] = useState(false);
+  const skipNextNotifSave = useRef(true);
+  const [savingNotif, setSavingNotif] = useState(false);
+
+  const loadNotifPrefs = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("notification_preferences")
+      .select("push, new_lead, new_review, missed_call, daily_summary, new_sms, email")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (data) {
+      setNotifPush(data.push);
+      setNotifNewLead(data.new_lead);
+      setNotifBooking(data.new_lead); // map booking → new_lead until a dedicated col exists
+      setNotifMissed(data.missed_call);
+      setNotifDaily(data.daily_summary);
+      setNotifWeekly(data.new_review); // reuse new_review slot for weekly
+      setNotifEmail(data.email);
+    }
+    skipNextNotifSave.current = true;
+    setNotifLoaded(true);
+  };
+
+  // Auto-save notification prefs whenever they change
+  useEffect(() => {
+    if (!notifLoaded || !user) return;
+    if (skipNextNotifSave.current) {
+      skipNextNotifSave.current = false;
+      return;
+    }
+    const t = setTimeout(async () => {
+      setSavingNotif(true);
+      const { error } = await supabase
+        .from("notification_preferences")
+        .upsert({
+          user_id: user.id,
+          push: notifPush,
+          new_lead: notifNewLead,
+          missed_call: notifMissed,
+          daily_summary: notifDaily,
+          new_review: notifWeekly,
+          new_sms: true,
+          email: notifEmail,
+        }, { onConflict: "user_id" });
+      setSavingNotif(false);
+      if (error) toast.error("Couldn't save notification settings");
+    }, 500);
+    return () => clearTimeout(t);
+  }, [notifPush, notifNewLead, notifBooking, notifMissed, notifDaily, notifWeekly, notifEmail, notifLoaded, user]);
 
   // Security
   const [twoFA, setTwoFA] = useState(false);
