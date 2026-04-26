@@ -703,28 +703,63 @@ const Settings = () => {
 
       <Section title="Team access">
         <ul className="px-4 py-2 divide-y divide-border/60">
-          {team.map((t, i) => (
-            <li key={t.email} className="flex items-center justify-between py-2.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
-                  {t.email[0].toUpperCase()}
-                </span>
-                <div className="min-w-0">
-                  <div className="text-sm truncate">{t.email}</div>
-                  <div className="text-[10px] text-muted-foreground">{t.role}</div>
-                </div>
-              </div>
-              {t.role !== "Owner" && (
-                <button
-                  onClick={() => setTeam((p) => p.filter((_, j) => j !== i))}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </li>
-          ))}
+          {team.length === 0 ? (
+            <li className="py-3 text-[11px] text-muted-foreground">No teammates yet.</li>
+          ) : (
+            team.map((t) => {
+              const display = t.display_name || t.email || "Teammate";
+              const sub = t.isYou ? "You" : t.email || "Member";
+              return (
+                <li key={t.user_id} className="flex items-center justify-between py-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
+                      {display[0].toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-sm truncate">{display}</div>
+                      <div className="text-[10px] text-muted-foreground truncate">{sub}</div>
+                    </div>
+                  </div>
+                </li>
+              );
+            })
+          )}
         </ul>
+        {invites.length > 0 && (
+          <div className="px-4 py-2">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Pending invites</div>
+            <ul className="divide-y divide-border/60">
+              {invites.map((inv) => {
+                const email = inv.notes?.startsWith("invite:") ? inv.notes.slice(7) : "Pending teammate";
+                return (
+                  <li key={inv.id} className="flex items-center gap-2 py-2">
+                    <span className="h-8 w-8 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                      <Mail className="h-3.5 w-3.5" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm truncate">{email}</div>
+                      <div className="text-[10px] text-muted-foreground truncate">Code: {inv.code} · {fmtRel(inv.created_at)}</div>
+                    </div>
+                    <button
+                      onClick={() => copyInviteLink(inv.code)}
+                      className="text-muted-foreground hover:text-primary"
+                      aria-label="Copy invite link"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => revokeInvite(inv.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                      aria-label="Revoke invite"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         <div className="px-4 pb-3 flex gap-2">
           <div className="relative flex-1">
             <Mail className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -737,9 +772,12 @@ const Settings = () => {
               onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), inviteTeammate())}
             />
           </div>
-          <Button size="sm" onClick={inviteTeammate}>
-            <UserPlus className="h-3.5 w-3.5" /> Invite
+          <Button size="sm" onClick={inviteTeammate} disabled={inviting || !companyId}>
+            <UserPlus className="h-3.5 w-3.5" /> {inviting ? "Creating…" : "Invite"}
           </Button>
+        </div>
+        <div className="px-4 pb-3 text-[10px] text-muted-foreground flex items-center gap-1.5">
+          <Link2 className="h-3 w-3" /> Creates a one-time signup link they can use to join your account.
         </div>
       </Section>
 
@@ -760,34 +798,6 @@ const Settings = () => {
         )}
       </Section>
 
-      <Section title="Integrations">
-        <div className="px-4 py-3.5">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="h-8 w-8 rounded-full bg-accent/15 text-accent flex items-center justify-center">
-              <Zap className="h-4 w-4" />
-            </span>
-            <div className="flex-1">
-              <div className="text-sm font-medium">Zapier</div>
-              <div className="text-[11px] text-muted-foreground">Send leads to HubSpot, Salesforce, Sheets, and 5,000+ apps</div>
-            </div>
-          </div>
-          <Input
-            value={zapHook}
-            onChange={(e) => setZapHook(e.target.value)}
-            placeholder="https://hooks.zapier.com/..."
-            className="h-9 bg-input"
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            className="mt-2 w-full"
-            disabled={!zapHook.trim()}
-            onClick={() => toast.success("Test event sent (demo)")}
-          >
-            Send test event
-          </Button>
-        </div>
-      </Section>
 
       <Section title="Active sessions">
         <ul className="px-4 py-2 divide-y divide-border/60">
