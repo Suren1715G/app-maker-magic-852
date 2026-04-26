@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Zap, Monitor, Smartphone, MapPin, Phone as PhoneIcon, Clock, CalendarPlus, CheckCircle2 } from "lucide-react";
+import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Monitor, Smartphone, MapPin, Phone as PhoneIcon, Clock, CalendarPlus, CheckCircle2, Copy, Link2 } from "lucide-react";
 import { sessions } from "@/data/mock";
 import { fmtRel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -104,28 +104,150 @@ const Settings = () => {
   const [notifMissed, setNotifMissed] = useState(true);
   const [notifDaily, setNotifDaily] = useState(true);
   const [notifWeekly, setNotifWeekly] = useState(false);
+  const [notifEmail, setNotifEmail] = useState(true);
+  const [notifLoaded, setNotifLoaded] = useState(false);
+  const skipNextNotifSave = useRef(true);
+  const [savingNotif, setSavingNotif] = useState(false);
+
+  const loadNotifPrefs = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("notification_preferences")
+      .select("push, new_lead, new_review, missed_call, daily_summary, new_sms, email")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (data) {
+      setNotifPush(data.push);
+      setNotifNewLead(data.new_lead);
+      setNotifBooking(data.new_lead); // map booking → new_lead until a dedicated col exists
+      setNotifMissed(data.missed_call);
+      setNotifDaily(data.daily_summary);
+      setNotifWeekly(data.new_review); // reuse new_review slot for weekly
+      setNotifEmail(data.email);
+    }
+    skipNextNotifSave.current = true;
+    setNotifLoaded(true);
+  };
+
+  // Auto-save notification prefs whenever they change
+  useEffect(() => {
+    if (!notifLoaded || !user) return;
+    if (skipNextNotifSave.current) {
+      skipNextNotifSave.current = false;
+      return;
+    }
+    const t = setTimeout(async () => {
+      setSavingNotif(true);
+      const { error } = await supabase
+        .from("notification_preferences")
+        .upsert({
+          user_id: user.id,
+          push: notifPush,
+          new_lead: notifNewLead,
+          missed_call: notifMissed,
+          daily_summary: notifDaily,
+          new_review: notifWeekly,
+          new_sms: true,
+          email: notifEmail,
+        }, { onConflict: "user_id" });
+      setSavingNotif(false);
+      if (error) toast.error("Couldn't save notification settings");
+    }, 500);
+    return () => clearTimeout(t);
+  }, [notifPush, notifNewLead, notifBooking, notifMissed, notifDaily, notifWeekly, notifEmail, notifLoaded, user]);
 
   // Security
   const [twoFA, setTwoFA] = useState(false);
 
   // Team
-  const [team, setTeam] = useState<{ email: string; role: string }[]>([
-    { email: "owner@sgs.com", role: "Owner" },
-  ]);
+  type TeamMember = { user_id: string; display_name: string | null; email: string | null; isYou: boolean };
+  type PendingInvite = { id: string; code: string; created_at: string; notes: string | null };
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [invites, setInvites] = useState<PendingInvite[]>([]);
   const [teamEmail, setTeamEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
 
   // White label
   const [whiteLabel, setWhiteLabel] = useState(false);
   const [brandName, setBrandName] = useState("SGS AI");
 
-  // Zapier
-  const [zapHook, setZapHook] = useState("");
-
-  const inviteTeammate = () => {
-    if (!teamEmail.trim()) return;
-    setTeam((p) => [...p, { email: teamEmail.trim(), role: "Receptionist" }]);
+  const inviteTeammate = async () => {
+    const email = teamEmail.trim().toLowerCase();
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+      toast.error("Enter a valid email address");
+      return;
+    }
+    if (!companyId) {
+      toast.error("No company linked to your account");
+      return;
+    }
+    setInviting(true);
+    // Generate an 8-char alphanumeric code (no ambiguous chars)
+    const ALPHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 8; i++) code += ALPHA[Math.floor(Math.random() * ALPHA.length)];
+    const { error } = await supabase.from("access_codes").insert({
+      company_id: companyId,
+      code,
+      created_by: user?.id ?? null,
+      notes: `invite:${email}`,
+    });
+    setInviting(false);
+    if (error) {
+      toast.error(error.message ?? "Could not create invite");
+      return;
+    }
     setTeamEmail("");
-    toast.success("Invite sent (demo)");
+    await loadTeam(companyId);
+    toast.success("Invite created — share the link below");
+  };
+
+  const revokeInvite = async (id: string) => {
+    const { error } = await supabase.from("access_codes").delete().eq("id", id);
+    if (error) {
+      toast.error("Could not revoke");
+      return;
+    }
+    setInvites((p) => p.filter((i) => i.id !== id));
+    toast.success("Invite revoked");
+  };
+
+  const copyInviteLink = async (code: string) => {
+    const url = `${window.location.origin}/auth?code=${encodeURIComponent(code)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Invite link copied");
+    } catch {
+      toast.error("Couldn't copy — link: " + url);
+    }
+  };
+
+  const loadTeam = async (cid: string) => {
+    // Members: profiles in same company
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, display_name")
+      .eq("company_id", cid);
+    const members: TeamMember[] = (profiles ?? []).map((p) => ({
+      user_id: p.user_id,
+      display_name: p.display_name,
+      email: p.user_id === user?.id ? (user?.email ?? null) : null,
+      isYou: p.user_id === user?.id,
+    }));
+    setTeam(members);
+    // Pending invites: unused access codes for this company
+    const { data: codes } = await supabase
+      .from("access_codes")
+      .select("id, code, created_at, notes, used_by")
+      .eq("company_id", cid)
+      .is("used_by", null)
+      .order("created_at", { ascending: false });
+    setInvites((codes ?? []).map((c) => ({
+      id: c.id,
+      code: c.code,
+      created_at: c.created_at,
+      notes: c.notes,
+    })));
   };
 
   // Keep the dark-mode switch in sync if the theme is changed elsewhere
@@ -196,6 +318,8 @@ const Settings = () => {
       setHoursLoaded(true);
       await loadLocations(profile.company_id);
       await loadRequests(profile.company_id);
+      await loadTeam(profile.company_id);
+      await loadNotifPrefs();
     })();
   }, [user]);
 
@@ -604,11 +728,15 @@ const Settings = () => {
 
       <Section title="Notifications">
         <Toggle label="Push notifications" hint="On this device" checked={notifPush} onChange={setNotifPush} />
+        <Toggle label="Email notifications" hint="Send alerts to your email" checked={notifEmail} onChange={setNotifEmail} />
         <Toggle label="New lead" hint="Instant alert when a caller becomes a lead" checked={notifNewLead} onChange={setNotifNewLead} />
         <Toggle label="Appointment booked" hint="When AI books a slot" checked={notifBooking} onChange={setNotifBooking} />
         <Toggle label="Missed call" hint="Caller hung up — auto SMS sent" checked={notifMissed} onChange={setNotifMissed} />
         <Toggle label="Daily 9am summary" hint="Yesterday's recap by email" checked={notifDaily} onChange={setNotifDaily} />
         <Toggle label="Weekly performance report" hint="Mondays by email" checked={notifWeekly} onChange={setNotifWeekly} />
+        <div className="px-4 py-2 text-[10px] text-muted-foreground">
+          {savingNotif ? "Saving…" : notifLoaded ? "Saved ✓" : ""}
+        </div>
       </Section>
 
       <Section title="Security">
@@ -630,28 +758,63 @@ const Settings = () => {
 
       <Section title="Team access">
         <ul className="px-4 py-2 divide-y divide-border/60">
-          {team.map((t, i) => (
-            <li key={t.email} className="flex items-center justify-between py-2.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
-                  {t.email[0].toUpperCase()}
-                </span>
-                <div className="min-w-0">
-                  <div className="text-sm truncate">{t.email}</div>
-                  <div className="text-[10px] text-muted-foreground">{t.role}</div>
-                </div>
-              </div>
-              {t.role !== "Owner" && (
-                <button
-                  onClick={() => setTeam((p) => p.filter((_, j) => j !== i))}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </li>
-          ))}
+          {team.length === 0 ? (
+            <li className="py-3 text-[11px] text-muted-foreground">No teammates yet.</li>
+          ) : (
+            team.map((t) => {
+              const display = t.display_name || t.email || "Teammate";
+              const sub = t.isYou ? "You" : t.email || "Member";
+              return (
+                <li key={t.user_id} className="flex items-center justify-between py-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
+                      {display[0].toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-sm truncate">{display}</div>
+                      <div className="text-[10px] text-muted-foreground truncate">{sub}</div>
+                    </div>
+                  </div>
+                </li>
+              );
+            })
+          )}
         </ul>
+        {invites.length > 0 && (
+          <div className="px-4 py-2">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Pending invites</div>
+            <ul className="divide-y divide-border/60">
+              {invites.map((inv) => {
+                const email = inv.notes?.startsWith("invite:") ? inv.notes.slice(7) : "Pending teammate";
+                return (
+                  <li key={inv.id} className="flex items-center gap-2 py-2">
+                    <span className="h-8 w-8 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                      <Mail className="h-3.5 w-3.5" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm truncate">{email}</div>
+                      <div className="text-[10px] text-muted-foreground truncate">Code: {inv.code} · {fmtRel(inv.created_at)}</div>
+                    </div>
+                    <button
+                      onClick={() => copyInviteLink(inv.code)}
+                      className="text-muted-foreground hover:text-primary"
+                      aria-label="Copy invite link"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => revokeInvite(inv.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                      aria-label="Revoke invite"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         <div className="px-4 pb-3 flex gap-2">
           <div className="relative flex-1">
             <Mail className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -664,9 +827,12 @@ const Settings = () => {
               onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), inviteTeammate())}
             />
           </div>
-          <Button size="sm" onClick={inviteTeammate}>
-            <UserPlus className="h-3.5 w-3.5" /> Invite
+          <Button size="sm" onClick={inviteTeammate} disabled={inviting || !companyId}>
+            <UserPlus className="h-3.5 w-3.5" /> {inviting ? "Creating…" : "Invite"}
           </Button>
+        </div>
+        <div className="px-4 pb-3 text-[10px] text-muted-foreground flex items-center gap-1.5">
+          <Link2 className="h-3 w-3" /> Creates a one-time signup link they can use to join your account.
         </div>
       </Section>
 
@@ -687,34 +853,6 @@ const Settings = () => {
         )}
       </Section>
 
-      <Section title="Integrations">
-        <div className="px-4 py-3.5">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="h-8 w-8 rounded-full bg-accent/15 text-accent flex items-center justify-center">
-              <Zap className="h-4 w-4" />
-            </span>
-            <div className="flex-1">
-              <div className="text-sm font-medium">Zapier</div>
-              <div className="text-[11px] text-muted-foreground">Send leads to HubSpot, Salesforce, Sheets, and 5,000+ apps</div>
-            </div>
-          </div>
-          <Input
-            value={zapHook}
-            onChange={(e) => setZapHook(e.target.value)}
-            placeholder="https://hooks.zapier.com/..."
-            className="h-9 bg-input"
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            className="mt-2 w-full"
-            disabled={!zapHook.trim()}
-            onClick={() => toast.success("Test event sent (demo)")}
-          >
-            Send test event
-          </Button>
-        </div>
-      </Section>
 
       <Section title="Active sessions">
         <ul className="px-4 py-2 divide-y divide-border/60">
