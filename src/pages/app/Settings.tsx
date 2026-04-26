@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Zap, Monitor, Smartphone, MapPin, Phone as PhoneIcon, Clock, CalendarPlus, CheckCircle2 } from "lucide-react";
 import { sessions } from "@/data/mock";
@@ -56,6 +56,9 @@ const Settings = () => {
   const [timezone, setTimezone] = useState<string>(DEFAULT_TIMEZONE);
   const [hoursLoaded, setHoursLoaded] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
+  // Skip the auto-save effect's very first run after initial DB load
+  // (otherwise we hit the edge function with no actual change).
+  const skipNextHoursSave = useRef(true);
   const [aiVoiceId, setAiVoiceId] = useState<string>(DEFAULT_VOICE_ID);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [savingAi, setSavingAi] = useState(false);
@@ -189,6 +192,7 @@ const Settings = () => {
         }
         setTimezone(company.business_hours_timezone || DEFAULT_TIMEZONE);
       }
+      skipNextHoursSave.current = true;
       setHoursLoaded(true);
       await loadLocations(profile.company_id);
       await loadRequests(profile.company_id);
@@ -198,6 +202,10 @@ const Settings = () => {
   // Auto-save business hours whenever they change (after the initial load).
   useEffect(() => {
     if (!hoursLoaded || !companyId) return;
+    if (skipNextHoursSave.current) {
+      skipNextHoursSave.current = false;
+      return;
+    }
     const t = setTimeout(async () => {
       setSavingHours(true);
       const { error } = await supabase
