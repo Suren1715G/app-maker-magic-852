@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Zap, Monitor, Smartphone, MapPin, Phone as PhoneIcon, Clock, CalendarPlus, CheckCircle2 } from "lucide-react";
+import { ExternalLink, LogOut, Plus, Trash2, Upload, ShieldCheck, UserPlus, Mail, Palette, Monitor, Smartphone, MapPin, Phone as PhoneIcon, Clock, CalendarPlus, CheckCircle2, Copy, Link2 } from "lucide-react";
 import { sessions } from "@/data/mock";
 import { fmtRel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -109,23 +109,94 @@ const Settings = () => {
   const [twoFA, setTwoFA] = useState(false);
 
   // Team
-  const [team, setTeam] = useState<{ email: string; role: string }[]>([
-    { email: "owner@sgs.com", role: "Owner" },
-  ]);
+  type TeamMember = { user_id: string; display_name: string | null; email: string | null; isYou: boolean };
+  type PendingInvite = { id: string; code: string; created_at: string; notes: string | null };
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [invites, setInvites] = useState<PendingInvite[]>([]);
   const [teamEmail, setTeamEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
 
   // White label
   const [whiteLabel, setWhiteLabel] = useState(false);
   const [brandName, setBrandName] = useState("SGS AI");
 
-  // Zapier
-  const [zapHook, setZapHook] = useState("");
-
-  const inviteTeammate = () => {
-    if (!teamEmail.trim()) return;
-    setTeam((p) => [...p, { email: teamEmail.trim(), role: "Receptionist" }]);
+  const inviteTeammate = async () => {
+    const email = teamEmail.trim().toLowerCase();
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+      toast.error("Enter a valid email address");
+      return;
+    }
+    if (!companyId) {
+      toast.error("No company linked to your account");
+      return;
+    }
+    setInviting(true);
+    // Generate an 8-char alphanumeric code (no ambiguous chars)
+    const ALPHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 8; i++) code += ALPHA[Math.floor(Math.random() * ALPHA.length)];
+    const { error } = await supabase.from("access_codes").insert({
+      company_id: companyId,
+      code,
+      created_by: user?.id ?? null,
+      notes: `invite:${email}`,
+    });
+    setInviting(false);
+    if (error) {
+      toast.error(error.message ?? "Could not create invite");
+      return;
+    }
     setTeamEmail("");
-    toast.success("Invite sent (demo)");
+    await loadTeam(companyId);
+    toast.success("Invite created — share the link below");
+  };
+
+  const revokeInvite = async (id: string) => {
+    const { error } = await supabase.from("access_codes").delete().eq("id", id);
+    if (error) {
+      toast.error("Could not revoke");
+      return;
+    }
+    setInvites((p) => p.filter((i) => i.id !== id));
+    toast.success("Invite revoked");
+  };
+
+  const copyInviteLink = async (code: string) => {
+    const url = `${window.location.origin}/auth?code=${encodeURIComponent(code)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Invite link copied");
+    } catch {
+      toast.error("Couldn't copy — link: " + url);
+    }
+  };
+
+  const loadTeam = async (cid: string) => {
+    // Members: profiles in same company
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, display_name")
+      .eq("company_id", cid);
+    const members: TeamMember[] = (profiles ?? []).map((p) => ({
+      user_id: p.user_id,
+      display_name: p.display_name,
+      email: p.user_id === user?.id ? (user?.email ?? null) : null,
+      isYou: p.user_id === user?.id,
+    }));
+    setTeam(members);
+    // Pending invites: unused access codes for this company
+    const { data: codes } = await supabase
+      .from("access_codes")
+      .select("id, code, created_at, notes, used_by")
+      .eq("company_id", cid)
+      .is("used_by", null)
+      .order("created_at", { ascending: false });
+    setInvites((codes ?? []).map((c) => ({
+      id: c.id,
+      code: c.code,
+      created_at: c.created_at,
+      notes: c.notes,
+    })));
   };
 
   // Keep the dark-mode switch in sync if the theme is changed elsewhere
@@ -196,6 +267,8 @@ const Settings = () => {
       setHoursLoaded(true);
       await loadLocations(profile.company_id);
       await loadRequests(profile.company_id);
+      await loadTeam(profile.company_id);
+      await loadNotifPrefs();
     })();
   }, [user]);
 
