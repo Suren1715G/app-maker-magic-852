@@ -66,7 +66,10 @@ const MasterOverview = () => {
     const { error: insertErr } = await supabase.from("company_phone_numbers").insert({
       company_id: r.company_id,
       label: r.location_name,
-      phone_number: "Pending assignment",
+      // Phone numbers must be unique across the table, so we stash a unique
+      // placeholder tied to the request id. The owner replaces it with the real
+      // Twilio number on the company detail page.
+      phone_number: `pending:${r.id}`,
       provider: "twilio",
       status: "pending",
     });
