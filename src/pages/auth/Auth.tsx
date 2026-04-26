@@ -35,6 +35,13 @@ const Auth = () => {
     if (window.location.hash.includes("access_token")) {
       // Supabase will pick it up; nothing to do
     }
+    // Pre-fill access code from invite link (?code=ABC12345)
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code) {
+      setAccessCode(code.toUpperCase());
+      setMode("signup");
+    }
   }, []);
 
   if (loading) {
