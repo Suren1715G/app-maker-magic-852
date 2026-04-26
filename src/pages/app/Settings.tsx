@@ -728,11 +728,15 @@ const Settings = () => {
 
       <Section title="Notifications">
         <Toggle label="Push notifications" hint="On this device" checked={notifPush} onChange={setNotifPush} />
+        <Toggle label="Email notifications" hint="Send alerts to your email" checked={notifEmail} onChange={setNotifEmail} />
         <Toggle label="New lead" hint="Instant alert when a caller becomes a lead" checked={notifNewLead} onChange={setNotifNewLead} />
         <Toggle label="Appointment booked" hint="When AI books a slot" checked={notifBooking} onChange={setNotifBooking} />
         <Toggle label="Missed call" hint="Caller hung up — auto SMS sent" checked={notifMissed} onChange={setNotifMissed} />
         <Toggle label="Daily 9am summary" hint="Yesterday's recap by email" checked={notifDaily} onChange={setNotifDaily} />
         <Toggle label="Weekly performance report" hint="Mondays by email" checked={notifWeekly} onChange={setNotifWeekly} />
+        <div className="px-4 py-2 text-[10px] text-muted-foreground">
+          {savingNotif ? "Saving…" : notifLoaded ? "Saved ✓" : ""}
+        </div>
       </Section>
 
       <Section title="Security">
