@@ -5,19 +5,94 @@ import { fmtDay, fmtMoney, fmtRel, fmtTime } from "@/lib/format";
 import { Link } from "react-router-dom";
 import { ArrowRight, CalendarDays, Phone, Sparkles, Clock, Users } from "lucide-react";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+
+type LiveCall = {
+  id: string;
+  caller: string | null;
+  startedAt: string;
+  status: string;
+  summary: string | null;
+};
 
 const Home = () => {
   const isNew = useIsNewCustomer();
+  const { companyId } = useAuth();
+  const [liveCalls, setLiveCalls] = useState<LiveCall[]>([]);
 
-  const calls = isNew ? [] : mockCalls;
+  useEffect(() => {
+    if (!companyId) {
+      setLiveCalls([]);
+      return;
+    }
+    let cancelled = false;
+
+    const load = async () => {
+      const { data } = await supabase
+        .from("calls")
+        .select("id, caller, started_at, status, summary")
+        .eq("company_id", companyId)
+        .order("started_at", { ascending: false })
+        .limit(50);
+      if (cancelled) return;
+      setLiveCalls(
+        (data ?? []).map((c) => ({
+          id: c.id,
+          caller: c.caller,
+          startedAt: c.started_at,
+          status: c.status,
+          summary: c.summary,
+        })),
+      );
+    };
+    load();
+
+    const channel = supabase
+      .channel(`home-calls:${companyId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "calls", filter: `company_id=eq.${companyId}` },
+        () => load(),
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [companyId]);
+
+  const hasLive = liveCalls.length > 0;
+  const calls = hasLive ? [] : isNew ? [] : mockCalls;
   const bookings = isNew ? [] : mockBookings;
   const leads = isNew ? [] : mockLeads;
   const notifications = isNew ? [] : mockNotifications;
-  const stats = isNew
+  const baseStats = isNew || hasLive
     ? { callsToday: 0, bookingsToday: 0, conversionRate: 0, smsSent: 0, minutesSaved: 0, revenueBookedToday: 0 }
     : mockStats;
 
-  const recent = [...calls].sort((a, b) => +new Date(b.startedAt) - +new Date(a.startedAt)).slice(0, 3);
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const callsToday = liveCalls.filter((c) => new Date(c.startedAt) >= startOfToday).length;
+
+  const stats = {
+    ...baseStats,
+    callsToday: hasLive ? callsToday : baseStats.callsToday,
+  };
+
+  const recent = hasLive
+    ? liveCalls.slice(0, 3).map((c) => ({
+        id: c.id,
+        caller: c.caller ?? "Unknown caller",
+        startedAt: c.startedAt,
+        status: c.status,
+        summary: c.summary ?? "",
+      }))
+    : [...calls]
+        .sort((a, b) => +new Date(b.startedAt) - +new Date(a.startedAt))
+        .slice(0, 3);
   const next = [...bookings].sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt))[0];
   const newLeads = leads.filter((l) => l.status === "new" || l.status === "contacted").length;
   const unread = notifications.filter((n) => !n.read).length;
