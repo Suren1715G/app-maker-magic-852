@@ -1,9 +1,20 @@
 import { useEffect, useState } from "react";
 import { MasterShell } from "@/components/master/MasterShell";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, KeyRound, CheckCircle2, Users, Loader2, MapPin, Check, X } from "lucide-react";
+import { Building2, KeyRound, CheckCircle2, Users, Loader2, MapPin, Check, X, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 type Stats = {
   companies: number;
@@ -48,6 +59,11 @@ const MasterOverview = () => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [pending, setPending] = useState<PendingRequest[] | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
+  // Approval dialog state — owner enters the real Twilio number, then we
+  // create the location as ACTIVE in one shot.
+  const [approving, setApproving] = useState<PendingRequest | null>(null);
+  const [approvePhone, setApprovePhone] = useState("");
+  const [submittingApprove, setSubmittingApprove] = useState(false);
 
   const loadPending = async () => {
     const { data } = await supabase
@@ -58,32 +74,50 @@ const MasterOverview = () => {
     setPending((data ?? []) as unknown as PendingRequest[]);
   };
 
-  const approve = async (r: PendingRequest) => {
-    setActingId(r.id);
-    // Mark request scheduled (= confirmed/being provisioned) and add a phone-number
-    // placeholder under the company so the customer immediately sees a new location
-    // entry on their dashboard. Owner can fill in the real number afterwards.
+  // Open the approval dialog for a request.
+  const startApprove = (r: PendingRequest) => {
+    setApproving(r);
+    setApprovePhone("");
+  };
+
+  // Confirm approval: insert the new location as ACTIVE with the owner-provided
+  // Twilio number, mark the request closed.
+  const confirmApprove = async () => {
+    if (!approving) return;
+    const phone = approvePhone.trim();
+    if (!phone) return toast.error("Phone number is required");
+    // Loose E.164-ish check — must start with + and have 8+ digits.
+    if (!/^\+\d{8,15}$/.test(phone.replace(/\s|-/g, ""))) {
+      return toast.error("Use E.164 format, e.g. +15558675309");
+    }
+    setSubmittingApprove(true);
+    const cleanPhone = phone.replace(/\s|-/g, "");
     const { error: insertErr } = await supabase.from("company_phone_numbers").insert({
-      company_id: r.company_id,
-      label: r.location_name,
-      // Phone numbers must be unique across the table, so we stash a unique
-      // placeholder tied to the request id. The owner replaces it with the real
-      // Twilio number on the company detail page.
-      phone_number: `pending:${r.id}`,
+      company_id: approving.company_id,
+      label: approving.location_name,
+      phone_number: cleanPhone,
       provider: "twilio",
-      status: "pending",
+      status: "active",
     });
     if (insertErr) {
-      setActingId(null);
-      return toast.error(insertErr.message);
+      setSubmittingApprove(false);
+      return toast.error(
+        insertErr.code === "23505"
+          ? "That phone number is already in use on another location."
+          : insertErr.message,
+      );
     }
     const { error: updateErr } = await supabase
       .from("location_requests")
-      .update({ status: "scheduled" })
-      .eq("id", r.id);
-    setActingId(null);
+      .update({ status: "closed" })
+      .eq("id", approving.id);
+    setSubmittingApprove(false);
     if (updateErr) return toast.error(updateErr.message);
-    toast.success(`Approved — added "${r.location_name}" to ${r.companies?.name ?? "company"}`);
+    toast.success(
+      `Activated "${approving.location_name}" for ${approving.companies?.name ?? "company"}`,
+    );
+    setApproving(null);
+    setApprovePhone("");
     await loadPending();
   };
 
@@ -226,7 +260,7 @@ const MasterOverview = () => {
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button
-                    onClick={() => approve(r)}
+                    onClick={() => startApprove(r)}
                     disabled={actingId === r.id}
                     className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full bg-success/15 text-success hover:bg-success/25 disabled:opacity-50 transition-colors"
                   >
@@ -245,6 +279,56 @@ const MasterOverview = () => {
           </div>
         </>
       )}
+
+      {/* Approval dialog — collect the real Twilio number before activating */}
+      <Dialog open={!!approving} onOpenChange={(o) => !o && setApproving(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Phone className="h-4 w-4" /> Activate location
+            </DialogTitle>
+            <DialogDescription>
+              Enter the Twilio phone number for{" "}
+              <span className="font-medium text-foreground">
+                {approving?.location_name}
+              </span>{" "}
+              ({approving?.companies?.name}). The location will go live on the
+              customer's dashboard immediately.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="approve-phone">Twilio phone number</Label>
+            <Input
+              id="approve-phone"
+              value={approvePhone}
+              onChange={(e) => setApprovePhone(e.target.value)}
+              placeholder="+15558675309"
+              autoFocus
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Use E.164 format starting with +country code.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setApproving(null)}
+              disabled={submittingApprove}
+            >
+              Cancel
+            </Button>
+            <Button onClick={confirmApprove} disabled={submittingApprove}>
+              {submittingApprove ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Check className="h-4 w-4" /> Activate
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MasterShell>
   );
 };
