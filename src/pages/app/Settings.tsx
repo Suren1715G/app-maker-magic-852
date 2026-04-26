@@ -320,7 +320,17 @@ const Settings = () => {
       )}
 
       <Section title="Business">
-        <Field label="Phone number" value={phone} onChange={setPhone} />
+        <div className="px-4 py-3">
+          <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+            <PhoneIcon className="h-3 w-3" /> Phone number
+          </div>
+          <div className="h-9 rounded-md bg-input border border-border px-3 flex items-center text-sm font-medium">
+            {phone || <span className="text-muted-foreground font-normal">No number assigned yet</span>}
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-1.5">
+            Your live AI receptionist number. To change it, contact Support.
+          </div>
+        </div>
         <Toggle
           label="Always on (24/7)"
           hint="AI answers around the clock"
@@ -328,15 +338,39 @@ const Settings = () => {
           onChange={setAlwaysOn}
         />
         {!alwaysOn && (
-          <div className="px-4 py-3 grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-xs text-muted-foreground mb-1">Opens</div>
-              <Input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="h-9 bg-input" />
+          <>
+            <div className="px-4 py-3 grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Opens</div>
+                <Input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="h-9 bg-input" />
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Closes</div>
+                <Input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="h-9 bg-input" />
+              </div>
             </div>
-            <div>
-              <div className="text-xs text-muted-foreground mb-1">Closes</div>
-              <Input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="h-9 bg-input" />
+            <div className="px-4 py-3">
+              <div className="text-xs text-muted-foreground mb-1">Timezone</div>
+              <select
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                aria-label="Business timezone"
+                className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {TIMEZONE_OPTIONS.map((t) => (
+                  <option key={t.id} value={t.id}>{t.label}</option>
+                ))}
+              </select>
+              <div className="text-[10px] text-muted-foreground mt-1.5">
+                After hours, the AI politely tells callers you're closed and promises a callback.
+                {savingHours ? " · Saving…" : hoursLoaded ? " · Saved ✓" : ""}
+              </div>
             </div>
+          </>
+        )}
+        {alwaysOn && hoursLoaded && (
+          <div className="px-4 py-2.5 text-[10px] text-muted-foreground">
+            {savingHours ? "Saving…" : "Saved ✓"}
           </div>
         )}
       </Section>
