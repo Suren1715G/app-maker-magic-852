@@ -8,6 +8,7 @@ import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocationCtx } from "@/contexts/LocationContext";
 
 type LiveCall = {
   id: string;
@@ -20,6 +21,7 @@ type LiveCall = {
 const Home = () => {
   const isNew = useIsNewCustomer();
   const { companyId } = useAuth();
+  const { active } = useLocationCtx();
   const [liveCalls, setLiveCalls] = useState<LiveCall[]>([]);
 
   useEffect(() => {
@@ -30,10 +32,14 @@ const Home = () => {
     let cancelled = false;
 
     const load = async () => {
-      const { data } = await supabase
+      let q = supabase
         .from("calls")
         .select("id, caller, started_at, status, summary")
-        .eq("company_id", companyId)
+        .eq("company_id", companyId);
+      // When a single location is selected, scope to that line only.
+      // "all" shows the combined dashboard across every line.
+      if (active !== "all") q = q.eq("to_number", active.address);
+      const { data } = await q
         .order("started_at", { ascending: false })
         .limit(50);
       if (cancelled) return;
@@ -62,7 +68,7 @@ const Home = () => {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [companyId]);
+  }, [companyId, active]);
 
   const hasLive = liveCalls.length > 0;
   const calls = hasLive ? [] : isNew ? [] : mockCalls;
