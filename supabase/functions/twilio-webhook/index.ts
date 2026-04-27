@@ -194,6 +194,7 @@ Deno.serve(async (req) => {
         external_id: callSid,
         caller: params.CallerName || otherParty || "Unknown caller",
         phone: otherParty,
+        to_number: ourNumber,
         direction,
         status,
         duration_sec: duration,
