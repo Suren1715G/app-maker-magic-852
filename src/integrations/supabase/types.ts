@@ -138,6 +138,9 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          shared_calendar_id: string | null
+          shared_calendar_owner_user_id: string | null
+          shared_calendar_summary: string | null
           updated_at: string
         }
         Insert: {
@@ -151,6 +154,9 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          shared_calendar_id?: string | null
+          shared_calendar_owner_user_id?: string | null
+          shared_calendar_summary?: string | null
           updated_at?: string
         }
         Update: {
@@ -164,6 +170,9 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          shared_calendar_id?: string | null
+          shared_calendar_owner_user_id?: string | null
+          shared_calendar_summary?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -621,6 +630,18 @@ export type Database = {
     Functions: {
       claim_access_code: { Args: { _code: string }; Returns: string }
       generate_referral_code: { Args: never; Returns: string }
+      get_company_calendar_connection: {
+        Args: { _company_id: string }
+        Returns: {
+          access_token: string
+          calendar_id: string
+          calendar_summary: string
+          expires_at: string
+          owner_email: string
+          owner_user_id: string
+          refresh_token: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

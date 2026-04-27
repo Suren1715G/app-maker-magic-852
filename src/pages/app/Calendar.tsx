@@ -4,12 +4,15 @@ import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { bookings as mockBookings, type Booking } from "@/data/mock";
 import { fmtTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ChevronLeft, ChevronRight, Clock, MoreVertical, CalendarX, UserX, CalendarClock, Link2, Loader2, LogOut } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock, MoreVertical, CalendarX, UserX, CalendarClock, Link2, Loader2, LogOut, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,15 +66,36 @@ const Calendar = () => {
   const [scope, setScope] = useState<"upcoming" | "past" | "all">("all");
 
   // Google Calendar connection
-  const [gcalStatus, setGcalStatus] = useState<{ connected: boolean; email: string | null } | null>(null);
+  type CompanyShared = {
+    shared_configured: boolean;
+    calendar_id: string | null;
+    calendar_summary: string | null;
+    owner_email: string | null;
+    is_owner: boolean;
+    owner_token_present: boolean;
+  } | null;
+  const [gcalStatus, setGcalStatus] = useState<{
+    connected: boolean;
+    email: string | null;
+    company: CompanyShared;
+  } | null>(null);
   const [gcalLoading, setGcalLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [myCalendars, setMyCalendars] = useState<Array<{ id: string; summary: string; primary: boolean }>>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
 
   const refreshStatus = async () => {
     const { data, error } = await supabase.functions.invoke("google-calendar", {
       body: { action: "status" },
     });
-    if (!error && data) setGcalStatus({ connected: !!data.connected, email: data.email ?? null });
+    if (!error && data) {
+      setGcalStatus({
+        connected: !!data.connected,
+        email: data.email ?? null,
+        company: data.company ?? null,
+      });
+    }
   };
 
   const loadEvents = async () => {
@@ -112,9 +136,12 @@ const Calendar = () => {
   }, []);
 
   useEffect(() => {
-    if (gcalStatus?.connected) loadEvents();
+    // Show events whenever either: this user is connected, OR the company has
+    // a shared calendar set (the backend will use the owner's tokens).
+    const canLoad = gcalStatus?.connected || gcalStatus?.company?.shared_configured;
+    if (canLoad) loadEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gcalStatus?.connected]);
+  }, [gcalStatus?.connected, gcalStatus?.company?.shared_configured]);
 
   // Re-check status when window regains focus (after OAuth redirect tab closes)
   useEffect(() => {
@@ -152,8 +179,51 @@ const Calendar = () => {
       return;
     }
     toast.success("Google Calendar disconnected");
-    setGcalStatus({ connected: false, email: null });
+    await refreshStatus();
     setItems(isNew ? [] : mockBookings);
+  };
+
+  const openPicker = async () => {
+    setPickerOpen(true);
+    setPickerLoading(true);
+    const { data, error } = await supabase.functions.invoke("google-calendar", {
+      body: { action: "list_my_calendars" },
+    });
+    setPickerLoading(false);
+    if (error || data?.error) {
+      toast.error("Couldn't load your calendars");
+      return;
+    }
+    setMyCalendars(data.items ?? []);
+  };
+
+  const chooseSharedCalendar = async (cal: { id: string; summary: string }) => {
+    const { error } = await supabase.functions.invoke("google-calendar", {
+      body: {
+        action: "set_shared_calendar",
+        calendarId: cal.id,
+        calendarSummary: cal.summary,
+      },
+    });
+    if (error) {
+      toast.error("Failed to set company calendar");
+      return;
+    }
+    toast.success(`Company calendar set to "${cal.summary}"`);
+    setPickerOpen(false);
+    await refreshStatus();
+  };
+
+  const clearSharedCalendar = async () => {
+    const { error } = await supabase.functions.invoke("google-calendar", {
+      body: { action: "clear_shared_calendar" },
+    });
+    if (error) {
+      toast.error("Failed to clear company calendar");
+      return;
+    }
+    toast.success("Company calendar cleared");
+    await refreshStatus();
   };
 
   const filtered = useMemo(() => {
@@ -231,20 +301,40 @@ const Calendar = () => {
       <PageHeader
         title="Calendar"
         subtitle={
-          gcalStatus?.connected
-            ? `Synced with ${gcalStatus.email ?? "Google Calendar"}.`
-            : "Connect your Google Calendar to see real events."
+          gcalStatus?.company?.shared_configured
+            ? `Company calendar: ${gcalStatus.company.calendar_summary ?? "Shared"} · owned by ${gcalStatus.company.owner_email ?? "teammate"}`
+            : gcalStatus?.connected
+              ? `Synced with ${gcalStatus.email ?? "Google Calendar"}.`
+              : "Connect your Google Calendar to see real events."
         }
         right={
           gcalStatus?.connected ? (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="gap-1.5">
-                <Link2 className="h-3 w-3 text-success" /> Google synced
-              </Badge>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {gcalStatus.company?.shared_configured ? (
+                <Badge variant="secondary" className="gap-1.5">
+                  <Users className="h-3 w-3 text-success" /> Company calendar
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="gap-1.5">
+                  <Link2 className="h-3 w-3 text-success" /> Google synced
+                </Badge>
+              )}
+              {gcalStatus.company && !gcalStatus.company.shared_configured && (
+                <Button size="sm" variant="outline" onClick={openPicker}>
+                  <Users className="h-3.5 w-3.5" /> Set as company calendar
+                </Button>
+              )}
+              {gcalStatus.company?.shared_configured && gcalStatus.company.is_owner && (
+                <Button size="sm" variant="ghost" onClick={openPicker}>Change</Button>
+              )}
               <Button variant="ghost" size="sm" onClick={disconnect} aria-label="Disconnect Google">
                 <LogOut className="h-3.5 w-3.5" />
               </Button>
             </div>
+          ) : gcalStatus?.company?.shared_configured ? (
+            <Badge variant="secondary" className="gap-1.5">
+              <Users className="h-3 w-3 text-success" /> Company calendar
+            </Badge>
           ) : (
             <Button size="sm" onClick={startConnect} disabled={connecting}>
               {connecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
@@ -254,21 +344,75 @@ const Calendar = () => {
         }
       />
 
-      {gcalStatus && !gcalStatus.connected && (
+      {gcalStatus && !gcalStatus.connected && !gcalStatus.company?.shared_configured && (
         <div className="glass rounded-2xl p-4 mb-4 border border-dashed">
           <div className="text-sm">
             <div className="font-medium mb-1">Showing demo events</div>
             <div className="text-muted-foreground">
-              Connect your Google account to replace these with your real upcoming events.
+              Connect your Google account, or ask a teammate to set the company calendar, to see real events here.
             </div>
           </div>
         </div>
       )}
+
+      {gcalStatus?.company?.shared_configured && gcalStatus.company.is_owner && (
+        <div className="glass rounded-2xl p-3 mb-4 text-xs text-muted-foreground flex items-center gap-2">
+          <Users className="h-3.5 w-3.5 text-success shrink-0" />
+          You are hosting the company calendar for your team. Disconnecting will turn it off for everyone.
+          {gcalStatus.company.calendar_summary && (
+            <button onClick={clearSharedCalendar} className="ml-auto underline hover:text-foreground">
+              Stop sharing
+            </button>
+          )}
+        </div>
+      )}
+
       {gcalLoading && (
         <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
           <Loader2 className="h-3 w-3 animate-spin" /> Loading Google Calendar events…
         </div>
       )}
+
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Choose the company calendar</DialogTitle>
+            <DialogDescription>
+              Pick which of your Google calendars the whole team will share. Everyone in
+              your company will see and book on this calendar — no Google login required
+              for them.
+            </DialogDescription>
+          </DialogHeader>
+          {pickerLoading ? (
+            <div className="py-8 flex justify-center">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="max-h-[320px] overflow-y-auto -mx-1 px-1 space-y-1">
+              {myCalendars.length === 0 && (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  No calendars found.
+                </p>
+              )}
+              {myCalendars.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => chooseSharedCalendar(c)}
+                  className="w-full text-left rounded-lg px-3 py-2 hover:bg-accent/40 border border-border flex items-center justify-between gap-3"
+                >
+                  <span className="truncate">{c.summary}</span>
+                  {c.primary && (
+                    <Badge variant="secondary" className="text-[10px]">Primary</Badge>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPickerOpen(false)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex gap-2 mb-3">
         {(["all", "upcoming", "past"] as const).map((s) => (
