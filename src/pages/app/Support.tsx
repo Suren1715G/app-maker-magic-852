@@ -1,111 +1,164 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { ChevronDown, MessageSquare, Lightbulb, BookOpen, Send, Zap, Sparkles } from "lucide-react";
+import { ChevronDown, Lightbulb, BookOpen, Send, MessageSquare, Plus, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
-
-type Msg = { role: "user" | "assistant"; content: string };
-
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/support-chat`;
-
-const quickPrompts = [
-  "How do I forward my number?",
-  "How do I set up my services?",
-  "How does the AI greet customers?",
-  "How do I change my plan?",
-];
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { formatDistanceToNow } from "date-fns";
 
 const faqs = [
   { q: "How does the AI know my services & pricing?", a: "You configure your services and prices in Settings. The AI references those when answering callers." },
   { q: "What happens on a missed call?", a: "If the AI can't answer or the caller hangs up, an automatic SMS follow-up is sent within 5 seconds." },
   { q: "Can I forward my existing number?", a: "Yes — we provide a forwarding number you set on your existing line. Calls reroute to the AI seamlessly." },
   { q: "Will customers know they're talking to AI?", a: "By default no, the voice is natural. You can enable a disclosure in Settings if your industry requires it." },
-  { q: "How do reviews get auto-requested?", a: "After a successful booking is completed, the AI texts the customer with a one-tap link to your Google review page." },
 ];
 
+type Conversation = {
+  id: string;
+  subject: string | null;
+  status: string;
+  last_message_at: string;
+  last_message_preview: string | null;
+  unread_for_company: number;
+};
+
+type Message = {
+  id: string;
+  body: string;
+  sender_role: "company" | "admin";
+  created_at: string;
+};
+
 const Support = () => {
+  const { user, companyId } = useAuth();
   const [open, setOpen] = useState<number | null>(0);
   const [feature, setFeature] = useState("");
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>([
-    { role: "assistant", content: "Hi 👋 I'm **SGS Support**. How can I help you today?" },
-  ]);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
+
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [draft, setDraft] = useState("");
+  const [newSubject, setNewSubject] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, chatOpen]);
+  // Load conversations
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("support_conversations")
+        .select("id, subject, status, last_message_at, last_message_preview, unread_for_company")
+        .eq("company_id", companyId)
+        .order("last_message_at", { ascending: false });
+      if (cancelled) return;
+      setConversations((data ?? []) as Conversation[]);
+      if (data && data.length && !activeId) setActiveId(data[0].id);
+    })();
 
-  const send = async (text: string) => {
-    if (!text.trim() || busy) return;
-    const userMsg: Msg = { role: "user", content: text };
-    const next = [...messages, userMsg];
-    setMessages(next);
-    setInput("");
-    setBusy(true);
-    try {
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ messages: next.map((m) => ({ role: m.role, content: m.content })) }),
-      });
-      if (resp.status === 429) { toast.error("Too many requests — try again shortly."); setBusy(false); return; }
-      if (resp.status === 402) { toast.error("AI credits exhausted."); setBusy(false); return; }
-      if (!resp.ok || !resp.body) { toast.error("Chat failed"); setBusy(false); return; }
+    const ch = supabase
+      .channel(`support-conv-company-${companyId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "support_conversations", filter: `company_id=eq.${companyId}` }, async () => {
+        const { data } = await supabase
+          .from("support_conversations")
+          .select("id, subject, status, last_message_at, last_message_preview, unread_for_company")
+          .eq("company_id", companyId)
+          .order("last_message_at", { ascending: false });
+        setConversations((data ?? []) as Conversation[]);
+      })
+      .subscribe();
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      let so_far = "";
-      setMessages((p) => [...p, { role: "assistant", content: "" }]);
-      let done = false;
-      while (!done) {
-        const { done: d, value } = await reader.read();
-        if (d) break;
-        buf += decoder.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf("\n")) !== -1) {
-          let line = buf.slice(0, nl); buf = buf.slice(nl + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line.startsWith("data: ")) continue;
-          const json = line.slice(6).trim();
-          if (json === "[DONE]") { done = true; break; }
-          try {
-            const parsed = JSON.parse(json);
-            const c = parsed.choices?.[0]?.delta?.content;
-            if (c) {
-              so_far += c;
-              setMessages((p) => p.map((m, i) => i === p.length - 1 ? { ...m, content: so_far } : m));
-            }
-          } catch { buf = line + "\n" + buf; break; }
+    return () => { cancelled = true; supabase.removeChannel(ch); };
+  }, [companyId]);
+
+  // Load messages for active conversation
+  useEffect(() => {
+    if (!activeId) { setMessages([]); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("support_messages")
+        .select("id, body, sender_role, created_at")
+        .eq("conversation_id", activeId)
+        .order("created_at", { ascending: true });
+      if (cancelled) return;
+      setMessages((data ?? []) as Message[]);
+      // Mark as read for company side
+      await supabase
+        .from("support_conversations")
+        .update({ unread_for_company: 0 })
+        .eq("id", activeId);
+    })();
+
+    const ch = supabase
+      .channel(`support-msgs-${activeId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "support_messages", filter: `conversation_id=eq.${activeId}` }, (payload) => {
+        setMessages((prev) => [...prev, payload.new as Message]);
+        // mark read when admin reply arrives while we're viewing
+        if ((payload.new as Message).sender_role === "admin") {
+          supabase.from("support_conversations").update({ unread_for_company: 0 }).eq("id", activeId);
         }
-      }
-    } catch {
-      toast.error("Network error");
-    } finally {
-      setBusy(false);
-    }
+      })
+      .subscribe();
+
+    return () => { cancelled = true; supabase.removeChannel(ch); };
+  }, [activeId]);
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, activeId]);
+
+  const startConversation = async () => {
+    if (!companyId || !user) return;
+    if (!newSubject.trim()) { toast.error("Add a short subject"); return; }
+    setCreating(true);
+    const { data, error } = await supabase
+      .from("support_conversations")
+      .insert({ company_id: companyId, subject: newSubject.trim(), created_by: user.id })
+      .select("id, subject, status, last_message_at, last_message_preview, unread_for_company")
+      .single();
+    setCreating(false);
+    if (error || !data) { toast.error(error?.message ?? "Could not start conversation"); return; }
+    setNewSubject("");
+    setActiveId(data.id);
+    toast.success("Conversation started — say hi 👋");
   };
+
+  const send = async () => {
+    if (!draft.trim() || !activeId || !companyId || !user || sending) return;
+    setSending(true);
+    const body = draft.trim();
+    setDraft("");
+    const { error } = await supabase
+      .from("support_messages")
+      .insert({
+        conversation_id: activeId,
+        company_id: companyId,
+        sender_user_id: user.id,
+        sender_role: "company",
+        body,
+      });
+    setSending(false);
+    if (error) { toast.error(error.message); setDraft(body); }
+  };
+
+  const active = conversations.find((c) => c.id === activeId);
 
   return (
     <AppShell>
-      <PageHeader title="Support" subtitle="We're one tap away." />
+      <PageHeader title="Support" subtitle="Chat with our team — we typically reply within an hour." />
 
       <div className="grid grid-cols-2 gap-2 mb-6">
         <button
-          onClick={() => setChatOpen(true)}
+          onClick={() => document.getElementById("support-chat")?.scrollIntoView({ behavior: "smooth" })}
           className="glass rounded-2xl p-4 text-left"
         >
           <MessageSquare className="h-5 w-5 text-primary mb-2" />
           <div className="text-sm font-semibold">Chat with us</div>
-          <div className="text-[11px] text-muted-foreground">Instant AI replies</div>
+          <div className="text-[11px] text-muted-foreground">Real human replies</div>
         </button>
         <button
           onClick={() => toast.info("Onboarding tour coming soon")}
@@ -117,87 +170,90 @@ const Support = () => {
         </button>
       </div>
 
-      <Sheet open={chatOpen} onOpenChange={setChatOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl h-[85vh] flex flex-col p-0">
-          <SheetHeader className="px-5 pt-5 pb-3 border-b border-border/60">
-            <SheetTitle className="font-display text-xl flex items-center gap-2">
-              <span className="h-7 w-7 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground flex items-center justify-center">
-                <Zap className="h-3.5 w-3.5" />
-              </span>
-              Support Chat
-            </SheetTitle>
-          </SheetHeader>
-
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-            {messages.map((m, i) => (
-              <div key={i} className={`flex gap-2 ${m.role === "user" ? "justify-end" : ""}`}>
-                {m.role === "assistant" && (
-                  <span className="h-7 w-7 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground flex items-center justify-center shrink-0">
-                    <Zap className="h-3.5 w-3.5" />
-                  </span>
-                )}
-                <div
-                  className={
-                    m.role === "user"
-                      ? "max-w-[80%] rounded-2xl rounded-br-md px-3.5 py-2.5 text-sm bg-gradient-to-br from-primary to-accent text-primary-foreground"
-                      : "max-w-[80%] rounded-2xl rounded-bl-md px-3.5 py-2.5 text-sm glass border border-primary/10"
-                  }
-                >
-                  <div className="prose prose-sm prose-invert max-w-none [&>p]:my-1 [&>ul]:my-1 [&>ol]:my-1">
-                    <ReactMarkdown>{m.content || "…"}</ReactMarkdown>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {messages.length <= 1 && (
-              <div className="pt-2">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                  <Sparkles className="h-3 w-3 text-primary" /> Try asking
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {quickPrompts.map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => send(q)}
-                      className="text-xs px-3 py-2.5 rounded-xl glass border border-primary/10 text-foreground/90 hover:border-primary/40 hover:bg-primary/5 transition-all text-left"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div ref={endRef} />
+      {/* Live chat panel */}
+      <div id="support-chat" className="glass rounded-2xl overflow-hidden mb-8">
+        <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-primary" />
+            <div className="font-display text-sm font-semibold">Support inbox</div>
           </div>
+          {conversations.length > 0 && (
+            <select
+              value={activeId ?? ""}
+              onChange={(e) => setActiveId(e.target.value || null)}
+              className="text-xs rounded-lg bg-input border border-border px-2 py-1.5 max-w-[55%] truncate"
+            >
+              {conversations.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {(c.subject || "Conversation")}{c.unread_for_company ? `  •  ${c.unread_for_company} new` : ""}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
 
+        {/* New conversation row (always available) */}
+        <div className="px-4 py-3 border-b border-border/60 flex items-center gap-2 bg-secondary/20">
+          <Input
+            value={newSubject}
+            onChange={(e) => setNewSubject(e.target.value)}
+            placeholder="Start a new conversation… (e.g. Need help forwarding my number)"
+            className="h-9"
+          />
+          <Button onClick={startConversation} disabled={creating || !newSubject.trim()} size="sm">
+            <Plus className="h-4 w-4" /> New
+          </Button>
+        </div>
+
+        {/* Messages */}
+        <div className="px-4 py-4 space-y-3 max-h-[55vh] overflow-y-auto">
+          {!activeId && (
+            <div className="text-center text-sm text-muted-foreground py-8">
+              No conversations yet. Start one above and our team will reply here.
+            </div>
+          )}
+          {activeId && messages.length === 0 && (
+            <div className="text-center text-sm text-muted-foreground py-6">
+              Say hi 👋 — send your first message below.
+            </div>
+          )}
+          {messages.map((m) => (
+            <div key={m.id} className={`flex ${m.sender_role === "company" ? "justify-end" : "justify-start"}`}>
+              <div className={cn(
+                "max-w-[80%] rounded-2xl px-3.5 py-2 text-sm",
+                m.sender_role === "company"
+                  ? "bg-gradient-to-br from-primary to-accent text-primary-foreground rounded-br-md"
+                  : "glass border border-primary/10 rounded-bl-md"
+              )}>
+                <div className="whitespace-pre-wrap">{m.body}</div>
+                <div className={cn("text-[10px] mt-1 opacity-70", m.sender_role === "company" ? "text-primary-foreground" : "text-muted-foreground")}>
+                  {m.sender_role === "admin" ? "Support · " : ""}
+                  {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
+                </div>
+              </div>
+            </div>
+          ))}
+          <div ref={endRef} />
+        </div>
+
+        {/* Composer */}
+        {activeId && (
           <form
-            onSubmit={(e) => { e.preventDefault(); send(input); }}
-            className="p-3 border-t border-border/60"
+            onSubmit={(e) => { e.preventDefault(); send(); }}
+            className="p-3 border-t border-border/60 flex items-center gap-2"
           >
-            <div className="glass-strong rounded-full flex items-center gap-2 p-1.5 pl-4 border border-primary/20">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your question…"
-                className="border-0 bg-transparent focus-visible:ring-0 px-0 h-9"
-                disabled={busy}
-              />
-              <Button
-                type="submit"
-                size="icon"
-                className="h-9 w-9 rounded-full shrink-0"
-                disabled={busy || !input.trim()}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="text-[10px] text-muted-foreground text-center mt-2">
-              Need a human? Email <span className="text-foreground">support@sgs.ai</span>
-            </div>
+            <Input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Type a message…"
+              disabled={sending}
+            />
+            <Button type="submit" size="icon" disabled={sending || !draft.trim()}>
+              <Send className="h-4 w-4" />
+            </Button>
           </form>
-        </SheetContent>
-      </Sheet>
+        )}
+      </div>
 
       <h2 className="font-display text-lg font-semibold mb-3">FAQ</h2>
       <ul className="glass rounded-2xl divide-y divide-border/60 overflow-hidden mb-6">
