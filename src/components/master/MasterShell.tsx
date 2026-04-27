@@ -143,7 +143,7 @@ export function MasterShell({
 
         {/* Mobile bottom nav */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 glass-strong border-t border-border/60 safe-bottom">
-          <ul className="grid grid-cols-3">
+          <ul className="grid grid-cols-4">
             {items.map(({ to, end, label, icon: Icon }) => (
               <li key={to}>
                 <NavLink
