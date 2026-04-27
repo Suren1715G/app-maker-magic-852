@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Phone, CalendarDays, MessageSquare,
-  BarChart3, Bell, CreditCard, Gift, Bot, LifeBuoy, Settings, MoreHorizontal, LogOut, StickyNote,
+  BarChart3, Bell, CreditCard, Gift, Bot, LifeBuoy, Settings, MoreHorizontal, LogOut, StickyNote, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/co
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useTour } from "@/contexts/TourContext";
 
 const primary = [
   { to: "/", label: "Home", icon: LayoutDashboard },
@@ -33,6 +34,7 @@ export function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const { start: startTour } = useTour();
   const moreActive = more.some((m) => location.pathname === m.to || location.pathname.startsWith(m.to + "/"));
 
   const handleSignOut = async () => {
@@ -124,6 +126,24 @@ export function BottomNav() {
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">Sign out</div>
                     <div className="text-[10px] text-muted-foreground truncate">End your session</div>
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setTimeout(() => startTour(), 250);
+                }}
+                className="mt-2 w-full rounded-2xl p-3 border border-primary/40 bg-primary/10 hover:bg-primary/20 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="h-9 w-9 rounded-full bg-primary/20 text-primary flex items-center justify-center">
+                    <Sparkles className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">Get Started Tour</div>
+                    <div className="text-[10px] text-muted-foreground truncate">Replay the guided walkthrough</div>
                   </div>
                 </div>
               </button>
