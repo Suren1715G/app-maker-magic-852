@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDistanceToNow } from "date-fns";
+import { useTour } from "@/contexts/TourContext";
 
 const faqs = [
   { q: "How does the AI know my services & pricing?", a: "You configure your services and prices in Settings. The AI references those when answering callers." },
@@ -34,6 +35,7 @@ type Message = {
 
 const Support = () => {
   const { user, companyId } = useAuth();
+  const { start: startTour } = useTour();
   const [open, setOpen] = useState<number | null>(0);
   const [feature, setFeature] = useState("");
 
@@ -197,12 +199,12 @@ const Support = () => {
           <div className="text-[11px] text-muted-foreground">Real human replies</div>
         </button>
         <button
-          onClick={() => toast.info("Onboarding tour coming soon")}
+          onClick={() => startTour()}
           className="glass rounded-2xl p-4 text-left"
         >
           <BookOpen className="h-5 w-5 text-primary mb-2" />
           <div className="text-sm font-semibold">Get started tour</div>
-          <div className="text-[11px] text-muted-foreground">5 min walk-through</div>
+          <div className="text-[11px] text-muted-foreground">Full guided walkthrough</div>
         </button>
       </div>
 
