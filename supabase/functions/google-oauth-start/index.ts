@@ -10,6 +10,7 @@ const corsHeaders = {
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/business.manage",
   "https://www.googleapis.com/auth/userinfo.email",
   "openid",
 ].join(" ");

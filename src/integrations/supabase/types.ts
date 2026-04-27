@@ -136,6 +136,10 @@ export type Database = {
           business_hours_open: string
           business_hours_timezone: string
           created_at: string
+          google_business_account_id: string | null
+          google_business_location_id: string | null
+          google_business_location_name: string | null
+          google_business_owner_user_id: string | null
           id: string
           name: string
           shared_calendar_id: string | null
@@ -152,6 +156,10 @@ export type Database = {
           business_hours_open?: string
           business_hours_timezone?: string
           created_at?: string
+          google_business_account_id?: string | null
+          google_business_location_id?: string | null
+          google_business_location_name?: string | null
+          google_business_owner_user_id?: string | null
           id?: string
           name: string
           shared_calendar_id?: string | null
@@ -168,6 +176,10 @@ export type Database = {
           business_hours_open?: string
           business_hours_timezone?: string
           created_at?: string
+          google_business_account_id?: string | null
+          google_business_location_id?: string | null
+          google_business_location_name?: string | null
+          google_business_owner_user_id?: string | null
           id?: string
           name?: string
           shared_calendar_id?: string | null
@@ -483,6 +495,57 @@ export type Database = {
           created_at?: string
           id?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      reviews: {
+        Row: {
+          comment: string | null
+          company_id: string
+          created_at: string
+          fetched_at: string
+          google_review_id: string | null
+          id: string
+          posted_at: string
+          rating: number
+          reply_text: string | null
+          reply_updated_at: string | null
+          reviewer_name: string | null
+          reviewer_photo_url: string | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          comment?: string | null
+          company_id: string
+          created_at?: string
+          fetched_at?: string
+          google_review_id?: string | null
+          id?: string
+          posted_at?: string
+          rating?: number
+          reply_text?: string | null
+          reply_updated_at?: string | null
+          reviewer_name?: string | null
+          reviewer_photo_url?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          comment?: string | null
+          company_id?: string
+          created_at?: string
+          fetched_at?: string
+          google_review_id?: string | null
+          id?: string
+          posted_at?: string
+          rating?: number
+          reply_text?: string | null
+          reply_updated_at?: string | null
+          reviewer_name?: string | null
+          reviewer_photo_url?: string | null
+          source?: string
+          updated_at?: string
         }
         Relationships: []
       }
