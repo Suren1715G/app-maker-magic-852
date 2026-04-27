@@ -116,8 +116,8 @@ const Notifications = () => {
         </ul>
       )}
 
-      <h2 className="font-display text-lg font-semibold mb-3">Preferences</h2>
-      <div className="glass rounded-2xl divide-y divide-border/60 overflow-hidden mb-12">
+      <h2 data-tour="notif-prefs-heading" className="font-display text-lg font-semibold mb-3">Preferences</h2>
+      <div data-tour="notif-prefs" className="glass rounded-2xl divide-y divide-border/60 overflow-hidden mb-12">
         {PREF_ROWS.map(([k, label, hint]) => (
           <div key={k} className="flex items-center justify-between px-4 py-3.5">
             <div>

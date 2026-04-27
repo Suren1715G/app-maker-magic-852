@@ -143,7 +143,7 @@ const Referrals = () => {
         <PageHeader title="Referrals" subtitle="Give one month free, get one back." />
 
         {/* HERO STATUS */}
-        <section className="relative mb-20">
+        <section data-tour="ref-status" className="relative mb-20">
           <div className="glass-strong rounded-3xl p-6 md:p-8 text-center overflow-hidden gradient-border">
             <SectionLabel>YOUR STATUS</SectionLabel>
             <div className="font-display text-6xl md:text-8xl font-bold leading-none mt-2">
@@ -168,7 +168,7 @@ const Referrals = () => {
         </section>
 
         {/* TIER BREAKDOWN */}
-        <section className="relative mb-24">
+        <section data-tour="ref-tiers" className="relative mb-24">
           <SectionLabel>TIER BREAKDOWN</SectionLabel>
           <SectionHeading plain="Every signup." accent="Bigger discount." />
           <ul className="space-y-3">
@@ -221,7 +221,7 @@ const Referrals = () => {
         </section>
 
         {/* SAVINGS CALCULATOR */}
-        <section className="relative mb-24">
+        <section data-tour="ref-calc" className="relative mb-24">
           <SectionLabel>SAVINGS CALCULATOR</SectionLabel>
           <SectionHeading plain="Drag to see" accent="your bill." />
           <div className="glass-strong rounded-3xl p-6 md:p-10 relative overflow-hidden">
