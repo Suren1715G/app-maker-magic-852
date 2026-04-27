@@ -80,6 +80,27 @@ Deno.serve(async (req) => {
       meta.phone_number ??
       data.dynamic_variables?.system__caller_id ??
       null;
+    const toNumber =
+      meta.called_number ??
+      meta.to_number ??
+      data.dynamic_variables?.system__called_number ??
+      null;
+
+    // Skip in-app / web widget conversations — these are the business owner
+    // talking to their own AI assistant inside the app, not a real customer
+    // call to the business. Real inbound phone calls always have a caller_id
+    // (and usually a called_number) populated by the telephony layer.
+    const isPhoneCall = Boolean(phone) || Boolean(toNumber);
+    if (!isPhoneCall) {
+      console.log(
+        `Skipping in-app conversation ${conversationId} (no phone metadata)`,
+      );
+      return new Response(
+        JSON.stringify({ ok: true, skipped: "in-app conversation" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const startedAt = meta.start_time_unix_secs
       ? new Date(meta.start_time_unix_secs * 1000).toISOString()
       : new Date().toISOString();
@@ -93,6 +114,7 @@ Deno.serve(async (req) => {
         external_id: conversationId,
         caller: meta.caller_name ?? phone ?? "Unknown caller",
         phone,
+        to_number: toNumber,
         direction: "inbound",
         status: "answered",
         duration_sec: duration,
