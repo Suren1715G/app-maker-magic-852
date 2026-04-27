@@ -44,6 +44,7 @@ const Support = () => {
   const [newSubject, setNewSubject] = useState("");
   const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(false);
+  const [submittingFeature, setSubmittingFeature] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   // Load conversations
@@ -146,6 +147,41 @@ const Support = () => {
   };
 
   const active = conversations.find((c) => c.id === activeId);
+
+  // Feature request submit with client-side rate limit (5 per minute → 2 min cooldown)
+  const RATE_KEY = "sgs_feature_req_log";
+  const submitFeature = async () => {
+    if (!feature.trim() || !companyId || !user || submittingFeature) return;
+
+    const now = Date.now();
+    const log: number[] = JSON.parse(localStorage.getItem(RATE_KEY) || "[]");
+    const recent = log.filter((t) => now - t < 60_000);
+    const cooldownUntil = Number(localStorage.getItem(RATE_KEY + "_until") || 0);
+
+    if (cooldownUntil && now < cooldownUntil) {
+      const secs = Math.ceil((cooldownUntil - now) / 1000);
+      toast.error(`Slow down — try again in ${secs}s`);
+      return;
+    }
+    if (recent.length >= 5) {
+      const until = now + 2 * 60_000;
+      localStorage.setItem(RATE_KEY + "_until", String(until));
+      toast.error("Too many requests — please wait 2 minutes.");
+      return;
+    }
+
+    setSubmittingFeature(true);
+    const { error } = await supabase
+      .from("feature_requests")
+      .insert({ company_id: companyId, submitted_by: user.id, body: feature.trim() });
+    setSubmittingFeature(false);
+    if (error) { toast.error(error.message); return; }
+
+    recent.push(now);
+    localStorage.setItem(RATE_KEY, JSON.stringify(recent));
+    toast.success("Sent! We read every one.");
+    setFeature("");
+  };
 
   return (
     <AppShell>
@@ -293,8 +329,8 @@ const Support = () => {
         />
         <Button
           className="w-full mt-3"
-          disabled={!feature.trim()}
-          onClick={() => { toast.success("Sent! We read every one."); setFeature(""); }}
+          disabled={!feature.trim() || submittingFeature}
+          onClick={submitFeature}
         >
           Submit
         </Button>

@@ -262,6 +262,39 @@ export type Database = {
           },
         ]
       }
+      feature_requests: {
+        Row: {
+          admin_notes: string | null
+          body: string
+          company_id: string
+          created_at: string
+          id: string
+          status: string
+          submitted_by: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          body: string
+          company_id: string
+          created_at?: string
+          id?: string
+          status?: string
+          submitted_by: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          body?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          status?: string
+          submitted_by?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       location_requests: {
         Row: {
           company_id: string

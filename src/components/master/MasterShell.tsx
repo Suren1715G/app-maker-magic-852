@@ -8,6 +8,7 @@ import {
   Eye,
   Sparkles,
   Inbox,
+  Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ const items = [
   { to: "/master", end: true, label: "Overview", icon: LayoutGrid },
   { to: "/master/companies", label: "Companies", icon: Building2 },
   { to: "/master/support", label: "Support", icon: Inbox },
+  { to: "/master/feature-requests", label: "Requests", icon: Lightbulb },
   { to: "/master/codes", label: "Access codes", icon: KeyRound },
 ];
 
@@ -143,7 +145,7 @@ export function MasterShell({
 
         {/* Mobile bottom nav */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 glass-strong border-t border-border/60 safe-bottom">
-          <ul className="grid grid-cols-4">
+          <ul className="grid grid-cols-5">
             {items.map(({ to, end, label, icon: Icon }) => (
               <li key={to}>
                 <NavLink
