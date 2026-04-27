@@ -7,6 +7,7 @@ import {
   LogOut,
   Eye,
   Sparkles,
+  Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { toast } from "sonner";
 const items = [
   { to: "/master", end: true, label: "Overview", icon: LayoutGrid },
   { to: "/master/companies", label: "Companies", icon: Building2 },
+  { to: "/master/support", label: "Support", icon: Inbox },
   { to: "/master/codes", label: "Access codes", icon: KeyRound },
 ];
 
