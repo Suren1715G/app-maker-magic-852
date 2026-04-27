@@ -428,7 +428,7 @@ const MasterCompanyDetail = () => {
           </div>
           <section className="mt-6">
             <h2 className="font-display text-base font-semibold mb-3">Google Reviews</h2>
-            <GoogleReviewsPanel companyId={detail.id} canManage={true} />
+            <GoogleReviewsPanel companyId={data.id} canManage={true} />
           </section>
         </div>
       )}
