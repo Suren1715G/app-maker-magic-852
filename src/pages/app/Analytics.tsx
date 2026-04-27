@@ -4,9 +4,11 @@ import { fmtMoney } from "@/lib/format";
 import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Download, TrendingUp, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const ranges = [
   { id: "7d", label: "7 days" },
@@ -16,14 +18,70 @@ const ranges = [
 
 const Analytics = () => {
   const isNew = useIsNewCustomer();
-  const weeklySeries = isNew
-    ? mockWeeklySeries.map((d) => ({ ...d, calls: 0, bookings: 0, revenue: 0 }))
-    : mockWeeklySeries;
-  const heatmap = isNew
-    ? mockHeatmap.map((row) => ({ ...row, hours: row.hours.map(() => 0) }))
-    : mockHeatmap;
-  const stats = isNew ? { ...mockStats, minutesSaved: 0 } : mockStats;
+  const { companyId } = useAuth();
   const [range, setRange] = useState<(typeof ranges)[number]["id"]>("7d");
+  const [realCalls, setRealCalls] = useState<{ started_at: string; duration_sec: number | null }[]>([]);
+
+  const rangeStart = useMemo(() => {
+    const d = new Date();
+    if (range === "7d") d.setDate(d.getDate() - 6);
+    else if (range === "30d") d.setDate(d.getDate() - 29);
+    else d.setDate(1);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [range]);
+
+  useEffect(() => {
+    if (!isNew || !companyId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("calls")
+        .select("started_at,duration_sec")
+        .eq("company_id", companyId)
+        .gte("started_at", rangeStart.toISOString())
+        .order("started_at", { ascending: true })
+        .limit(1000);
+      if (!cancelled) setRealCalls(data ?? []);
+    })();
+    return () => { cancelled = true; };
+  }, [isNew, companyId, rangeStart]);
+
+  const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const { weeklySeries, heatmap, stats } = useMemo(() => {
+    if (!isNew) {
+      return { weeklySeries: mockWeeklySeries, heatmap: mockHeatmap, stats: mockStats };
+    }
+    // Build last-7-day series ending today (always 7 buckets for the chart)
+    const now = new Date();
+    const days: { day: string; date: Date; calls: number; bookings: number; revenue: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      d.setHours(0, 0, 0, 0);
+      days.push({ day: dayLabels[d.getDay()], date: d, calls: 0, bookings: 0, revenue: 0 });
+    }
+    const heat = dayLabels.map((d) => ({ day: d, hours: Array(24).fill(0) as number[] }));
+    let totalSec = 0;
+    for (const c of realCalls) {
+      const t = new Date(c.started_at);
+      totalSec += c.duration_sec ?? 0;
+      // heatmap by weekday/hour
+      heat[t.getDay()].hours[t.getHours()] += 1;
+      // weekly series
+      for (const bucket of days) {
+        const next = new Date(bucket.date); next.setDate(next.getDate() + 1);
+        if (t >= bucket.date && t < next) { bucket.calls += 1; break; }
+      }
+    }
+    return {
+      weeklySeries: days.map(({ day, calls, bookings, revenue }) => ({ day, calls, bookings, revenue })),
+      heatmap: heat,
+      stats: { ...mockStats, minutesSaved: Math.round(totalSec / 60) },
+    };
+  }, [isNew, realCalls]);
+
   const totalCalls = weeklySeries.reduce((a, b) => a + b.calls, 0);
   const totalBookings = weeklySeries.reduce((a, b) => a + b.bookings, 0);
   const totalRevenue = weeklySeries.reduce((a, b) => a + b.revenue, 0);
