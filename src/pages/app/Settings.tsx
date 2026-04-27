@@ -432,7 +432,7 @@ const Settings = () => {
       <PageHeader title="Settings" subtitle="Manage your AI receptionist." />
 
       {user && (
-        <div className="glass rounded-2xl p-4 mb-4 flex items-center gap-3">
+        <div data-tour="settings-account" className="glass rounded-2xl p-4 mb-4 flex items-center gap-3">
           {logo ? (
             <img src={logo} alt="Logo" className="h-10 w-10 rounded-full object-cover" />
           ) : (

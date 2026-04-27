@@ -99,7 +99,7 @@ const Assistant = () => {
   return (
     <AppShell>
       {/* Header */}
-      <header className="pt-4 pb-5 text-center">
+      <header data-tour="assistant-header" className="pt-4 pb-5 text-center">
         <span className="glass inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-primary items-center gap-1.5 mb-3">
           <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
           // 06 · ONLINE
@@ -137,7 +137,7 @@ const Assistant = () => {
       </div>
 
       {messages.length <= 1 && (
-        <div className="mb-3">
+        <div data-tour="assistant-suggestions" className="mb-3">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
             <Sparkles className="h-3 w-3 text-primary" />
             Try asking
@@ -157,6 +157,7 @@ const Assistant = () => {
       )}
 
       <form
+        data-tour="assistant-input"
         onSubmit={(e) => { e.preventDefault(); send(input); }}
         className="fixed bottom-[68px] left-0 right-0 z-30"
       >
