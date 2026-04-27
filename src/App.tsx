@@ -19,7 +19,6 @@ import CallDetail from "./pages/app/CallDetail";
 import Calendar from "./pages/app/Calendar";
 import Sms from "./pages/app/Sms";
 import Settings from "./pages/app/Settings";
-import Leads from "./pages/app/Leads";
 import Reviews from "./pages/app/Reviews";
 import Analytics from "./pages/app/Analytics";
 import Notifications from "./pages/app/Notifications";
@@ -75,7 +74,6 @@ const App = () => (
               <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
               <Route path="/sms" element={<ProtectedRoute><Sms /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-              <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
               <Route path="/reviews" element={<ProtectedRoute><Reviews /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />

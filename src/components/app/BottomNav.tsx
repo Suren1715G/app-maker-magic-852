@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard, Phone, CalendarDays, MessageSquare, Users,
+  LayoutDashboard, Phone, CalendarDays, MessageSquare,
   Star, BarChart3, Bell, CreditCard, Gift, Bot, LifeBuoy, Settings, MoreHorizontal, LogOut, StickyNote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,6 @@ const primary = [
 ];
 
 const more = [
-  { to: "/leads", label: "Leads (CRM)", icon: Users, hint: "Pipeline & notes" },
   { to: "/notes", label: "Notes", icon: StickyNote, hint: "Notes & reminders" },
   { to: "/analytics", label: "Analytics", icon: BarChart3, hint: "Charts & ROI" },
   { to: "/reviews", label: "Reviews", icon: Star, hint: "Google reviews" },
