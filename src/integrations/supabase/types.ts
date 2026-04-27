@@ -72,6 +72,7 @@ export type Database = {
           status: string
           summary: string | null
           tag: string | null
+          to_number: string | null
           transcript: Json | null
           updated_at: string
         }
@@ -91,6 +92,7 @@ export type Database = {
           status?: string
           summary?: string | null
           tag?: string | null
+          to_number?: string | null
           transcript?: Json | null
           updated_at?: string
         }
@@ -110,6 +112,7 @@ export type Database = {
           status?: string
           summary?: string | null
           tag?: string | null
+          to_number?: string | null
           transcript?: Json | null
           updated_at?: string
         }
