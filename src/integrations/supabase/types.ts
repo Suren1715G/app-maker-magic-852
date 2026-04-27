@@ -632,6 +632,86 @@ export type Database = {
         }
         Relationships: []
       }
+      support_conversations: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          last_message_at: string
+          last_message_preview: string | null
+          status: string
+          subject: string | null
+          unread_for_admin: number
+          unread_for_company: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_message_at?: string
+          last_message_preview?: string | null
+          status?: string
+          subject?: string | null
+          unread_for_admin?: number
+          unread_for_company?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_message_at?: string
+          last_message_preview?: string | null
+          status?: string
+          subject?: string | null
+          unread_for_admin?: number
+          unread_for_company?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      support_messages: {
+        Row: {
+          body: string
+          company_id: string
+          conversation_id: string
+          created_at: string
+          id: string
+          sender_role: string
+          sender_user_id: string | null
+        }
+        Insert: {
+          body: string
+          company_id: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          sender_role: string
+          sender_user_id?: string | null
+        }
+        Update: {
+          body?: string
+          company_id?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          sender_role?: string
+          sender_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "support_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_google_tokens: {
         Row: {
           access_token: string

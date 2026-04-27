@@ -30,6 +30,7 @@ import MasterOverview from "./pages/master/MasterOverview";
 import MasterCompanies from "./pages/master/MasterCompanies";
 import MasterCompanyDetail from "./pages/master/MasterCompanyDetail";
 import MasterCodes from "./pages/master/MasterCodes";
+import MasterSupport from "./pages/master/MasterSupport";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,7 @@ const App = () => (
               <Route path="/master/companies" element={<AdminRoute><MasterCompanies /></AdminRoute>} />
               <Route path="/master/companies/:id" element={<AdminRoute><MasterCompanyDetail /></AdminRoute>} />
               <Route path="/master/codes" element={<AdminRoute><MasterCodes /></AdminRoute>} />
+              <Route path="/master/support" element={<AdminRoute><MasterSupport /></AdminRoute>} />
 
               {/* Customer dashboard (admins only see this in demo mode) */}
               <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
