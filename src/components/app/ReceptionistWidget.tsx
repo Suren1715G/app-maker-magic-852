@@ -58,7 +58,6 @@ const NAV_DESTINATIONS: Record<string, { path: string; label: string }> = {
   sms: { path: "/sms", label: "Messages" },
   messages: { path: "/sms", label: "Messages" },
   texts: { path: "/sms", label: "Messages" },
-  leads: { path: "/leads", label: "Leads" },
   reviews: { path: "/reviews", label: "Reviews" },
   analytics: { path: "/analytics", label: "Analytics" },
   reports: { path: "/analytics", label: "Analytics" },
