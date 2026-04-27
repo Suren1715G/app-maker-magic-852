@@ -414,7 +414,7 @@ const Calendar = () => {
         </DialogContent>
       </Dialog>
 
-      <div className="flex gap-2 mb-3">
+      <div data-tour="cal-scope" className="flex gap-2 mb-3">
         {(["all", "upcoming", "past"] as const).map((s) => (
           <button
             key={s}
@@ -440,7 +440,7 @@ const Calendar = () => {
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div data-tour="cal-toolbar" className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate(0)}>Today</Button>
           <div className="flex items-center">

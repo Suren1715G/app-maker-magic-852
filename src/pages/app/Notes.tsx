@@ -118,7 +118,7 @@ const Notes = () => {
       />
 
       {adding && (
-        <div className="glass rounded-2xl p-4 mb-6 space-y-3 animate-slide-up">
+        <div data-tour="notes-form" className="glass rounded-2xl p-4 mb-6 space-y-3 animate-slide-up">
           <Input
             placeholder="Title"
             value={title}
@@ -159,7 +159,7 @@ const Notes = () => {
       ) : (
         <>
           {open.length > 0 && (
-            <ul className="space-y-2 mb-6">
+            <ul data-tour="notes-open" className="space-y-2 mb-6">
               {open.map((n) => (
                 <NoteItem key={n.id} note={n} onToggle={toggleDone} onDelete={remove} />
               ))}
@@ -170,7 +170,7 @@ const Notes = () => {
               <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
                 Completed
               </div>
-              <ul className="space-y-2">
+              <ul data-tour="notes-done" className="space-y-2">
                 {done.map((n) => (
                   <NoteItem key={n.id} note={n} onToggle={toggleDone} onDelete={remove} />
                 ))}

@@ -127,7 +127,7 @@ const Home = () => {
         <p className="text-sm text-muted-foreground mt-2">Your AI receptionist is on the line.</p>
       </header>
 
-      <div className="glass rounded-2xl p-4 flex items-center gap-3 mb-6">
+      <div data-tour="home-status" className="glass rounded-2xl p-4 flex items-center gap-3 mb-6">
         <span className="relative flex h-3 w-3">
           <span className="animate-pulse-glow absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
           <span className="relative inline-flex rounded-full h-3 w-3 bg-success" />
@@ -145,6 +145,7 @@ const Home = () => {
 
       <Link
         to="/analytics"
+        data-tour="home-hours-saved"
         className="glass rounded-2xl p-4 mb-6 flex items-center gap-3 gradient-border hover:bg-secondary/40 transition-colors"
       >
         <span className="h-11 w-11 rounded-full bg-primary/20 text-primary flex items-center justify-center">
@@ -161,7 +162,7 @@ const Home = () => {
         <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
       </Link>
 
-      <div className="grid grid-cols-2 gap-3 mb-8">
+      <div data-tour="home-stats" className="grid grid-cols-2 gap-3 mb-8">
         <StatCard label="Calls today" value={stats.callsToday} hint={isNew ? "—" : `${Math.round(stats.conversionRate * 100)}% booked`} icon={<Phone className="h-4 w-4" />} accent />
         <StatCard label="Bookings" value={stats.bookingsToday} hint={isNew ? "—" : `${fmtMoney(stats.revenueBookedToday)} booked`} icon={<CalendarDays className="h-4 w-4" />} />
         <StatCard label="New leads" value={newLeads} hint={isNew ? "—" : "In your pipeline"} icon={<Users className="h-4 w-4" />} />
@@ -169,7 +170,7 @@ const Home = () => {
       </div>
 
       {next ? (
-        <section className="mb-8">
+        <section data-tour="home-next-booking" className="mb-8">
           <SectionTitle title="Next booking" to="/calendar" />
           <Link
             to="/calendar"
@@ -189,7 +190,7 @@ const Home = () => {
           </Link>
         </section>
       ) : (
-        <section className="mb-8">
+        <section data-tour="home-next-booking" className="mb-8">
           <SectionTitle title="Next booking" to="/calendar" />
           <div className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground">
             No upcoming bookings.
@@ -197,7 +198,7 @@ const Home = () => {
         </section>
       )}
 
-      <section>
+      <section data-tour="home-recent-calls">
         <SectionTitle title="Recent calls" to="/calls" />
         {recent.length === 0 ? (
           <div className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground">

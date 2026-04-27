@@ -143,7 +143,7 @@ const Calls = () => {
 
       <p className="sr-only" aria-label={summarySentence}>{summarySentence}</p>
 
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div data-tour="calls-stats" className="grid grid-cols-3 gap-2 mb-4">
         <div aria-label={`Answered calls: ${answered} (${answerRate}% answer rate).`}>
           <StatCard label="Answered" value={answered} hint={`${answerRate}%`} />
         </div>
@@ -155,7 +155,7 @@ const Calls = () => {
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-3 mb-3 no-scrollbar">
+      <div data-tour="calls-filters" className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-3 mb-3 no-scrollbar">
         {filters.map((f) => (
           <button
             key={f.id}
@@ -172,7 +172,7 @@ const Calls = () => {
         ))}
       </div>
 
-      <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-3 mb-3 no-scrollbar">
+      <div data-tour="calls-tags" className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-3 mb-3 no-scrollbar">
         {tagFilters.map((t) => (
           <button
             key={t.id}
@@ -205,7 +205,7 @@ const Calls = () => {
         </div>
       </div>
 
-      <ul className="space-y-2">
+      <ul data-tour="calls-list" className="space-y-2">
         {list.map((c, idx) => {
           const Icon = c.status === "missed-followup" ? PhoneMissed : c.status === "booked" ? CheckCircle2 : PhoneIncoming;
           const tone =

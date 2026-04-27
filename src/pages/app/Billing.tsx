@@ -13,7 +13,7 @@ const Billing = () => {
     <AppShell>
       <PageHeader title="Billing" subtitle="Simple, all-inclusive pricing." />
 
-      <div className="glass rounded-2xl p-5 mb-5 gradient-border">
+      <div data-tour="billing-plan" className="glass rounded-2xl p-5 mb-5 gradient-border">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-xs uppercase tracking-wider text-primary">Current plan</div>
@@ -32,7 +32,7 @@ const Billing = () => {
         <div className="text-xs text-muted-foreground mt-4">Next payment: <span className="text-foreground">Dec 4, 2025</span></div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 mb-6">
+      <div data-tour="billing-actions" className="grid grid-cols-2 gap-2 mb-6">
         <Button variant="outline" onClick={() => toast.info("Plan options coming soon")}>Change plan</Button>
         <Button
           variant="outline"
@@ -48,7 +48,7 @@ const Billing = () => {
         </Button>
       </div>
 
-      <h2 className="font-display text-lg font-semibold mb-3">Invoice history</h2>
+      <h2 data-tour="billing-invoices-heading" className="font-display text-lg font-semibold mb-3">Invoice history</h2>
       {invoices.length === 0 ? (
         <div className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground mb-12">
           No invoices yet.

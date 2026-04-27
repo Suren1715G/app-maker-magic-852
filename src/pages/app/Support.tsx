@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDistanceToNow } from "date-fns";
+import { useTour } from "@/contexts/TourContext";
 
 const faqs = [
   { q: "How does the AI know my services & pricing?", a: "You configure your services and prices in Settings. The AI references those when answering callers." },
@@ -34,6 +35,7 @@ type Message = {
 
 const Support = () => {
   const { user, companyId } = useAuth();
+  const { start: startTour } = useTour();
   const [open, setOpen] = useState<number | null>(0);
   const [feature, setFeature] = useState("");
 
@@ -187,7 +189,7 @@ const Support = () => {
     <AppShell>
       <PageHeader title="Support" subtitle="Chat with our team — we typically reply within an hour." />
 
-      <div className="grid grid-cols-2 gap-2 mb-6">
+      <div data-tour="support-shortcuts" className="grid grid-cols-2 gap-2 mb-6">
         <button
           onClick={() => document.getElementById("support-chat")?.scrollIntoView({ behavior: "smooth" })}
           className="glass rounded-2xl p-4 text-left"
@@ -197,17 +199,17 @@ const Support = () => {
           <div className="text-[11px] text-muted-foreground">Real human replies</div>
         </button>
         <button
-          onClick={() => toast.info("Onboarding tour coming soon")}
+          onClick={() => startTour()}
           className="glass rounded-2xl p-4 text-left"
         >
           <BookOpen className="h-5 w-5 text-primary mb-2" />
           <div className="text-sm font-semibold">Get started tour</div>
-          <div className="text-[11px] text-muted-foreground">5 min walk-through</div>
+          <div className="text-[11px] text-muted-foreground">Full guided walkthrough</div>
         </button>
       </div>
 
       {/* Live chat panel */}
-      <div id="support-chat" className="glass rounded-2xl overflow-hidden mb-8">
+      <div id="support-chat" data-tour="support-chat" className="glass rounded-2xl overflow-hidden mb-8">
         <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-primary" />
@@ -298,8 +300,8 @@ const Support = () => {
         )}
       </div>
 
-      <h2 className="font-display text-lg font-semibold mb-3">FAQ</h2>
-      <ul className="glass rounded-2xl divide-y divide-border/60 overflow-hidden mb-6">
+      <h2 data-tour="support-faq-heading" className="font-display text-lg font-semibold mb-3">FAQ</h2>
+      <ul data-tour="support-faq" className="glass rounded-2xl divide-y divide-border/60 overflow-hidden mb-6">
         {faqs.map((f, i) => (
           <li key={i}>
             <button
@@ -316,10 +318,10 @@ const Support = () => {
         ))}
       </ul>
 
-      <h2 className="font-display text-lg font-semibold mb-3 flex items-center gap-2">
+      <h2 data-tour="support-feature-heading" className="font-display text-lg font-semibold mb-3 flex items-center gap-2">
         <Lightbulb className="h-4 w-4 text-accent" /> Request a feature
       </h2>
-      <div className="glass rounded-2xl p-4 mb-12">
+      <div data-tour="support-feature" className="glass rounded-2xl p-4 mb-12">
         <textarea
           value={feature}
           onChange={(e) => setFeature(e.target.value)}

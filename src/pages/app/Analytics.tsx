@@ -135,7 +135,7 @@ const Analytics = () => {
         }
       />
 
-      <div className="flex gap-2 mb-5">
+      <div data-tour="analytics-range" className="flex gap-2 mb-5">
         {ranges.map((r) => (
           <button
             key={r.id}
@@ -150,7 +150,7 @@ const Analytics = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-5">
+      <div data-tour="analytics-stats" className="grid grid-cols-2 gap-3 mb-5">
         <Stat label="Calls" value={totalCalls} delta="+18% MoM" />
         <Stat label="Bookings" value={totalBookings} delta={totalCalls > 0 ? `${conv}% conv.` : "—"} />
         <Stat label="Revenue" value={fmtMoney(totalRevenue)} delta="+22% MoM" />
@@ -158,7 +158,7 @@ const Analytics = () => {
       </div>
 
       <Card title="Call volume">
-        <div className="h-44">
+        <div data-tour="analytics-volume" className="h-44">
           <ResponsiveContainer>
             <AreaChart data={weeklySeries} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
               <defs>
@@ -178,7 +178,7 @@ const Analytics = () => {
       </Card>
 
       <Card title="Bookings & revenue">
-        <div className="h-44">
+        <div data-tour="analytics-bookings" className="h-44">
           <ResponsiveContainer>
             <BarChart data={weeklySeries} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" vertical={false} />
@@ -192,7 +192,7 @@ const Analytics = () => {
       </Card>
 
       <Card title="Best call hours">
-        <div className="overflow-x-auto -mx-1 px-1 no-scrollbar">
+        <div data-tour="analytics-heatmap" className="overflow-x-auto -mx-1 px-1 no-scrollbar">
           <div className="min-w-[520px]">
             <div className="grid grid-cols-[36px_repeat(24,minmax(14px,1fr))] gap-px text-[9px] text-muted-foreground mb-1">
               <div></div>

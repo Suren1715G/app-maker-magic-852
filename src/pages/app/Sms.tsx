@@ -225,7 +225,7 @@ const Sms = () => {
           ".";
         return <p className="sr-only" aria-label={summary}>{summary}</p>;
       })()}
-      <ul className="space-y-2">
+      <ul data-tour="sms-threads" className="space-y-2">
         {threads.map((t) => {
           const last = t.messages[t.messages.length - 1];
           const threadLabel =
