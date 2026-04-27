@@ -913,12 +913,15 @@ const Settings = () => {
   );
 };
 
-const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="mb-4">
-    <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2 px-1">{title}</h2>
-    <div className="glass rounded-2xl divide-y divide-border/60 overflow-hidden">{children}</div>
-  </div>
-);
+const Section = ({ title, children }: { title: string; children: React.ReactNode }) => {
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  return (
+    <div data-tour={`settings-section-${slug}`} className="mb-4">
+      <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2 px-1">{title}</h2>
+      <div className="glass rounded-2xl divide-y divide-border/60 overflow-hidden">{children}</div>
+    </div>
+  );
+};
 
 const Field = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => (
   <div className="px-4 py-3">
