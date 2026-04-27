@@ -9,6 +9,7 @@ import { StatCard } from "@/components/app/StatCard";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocationCtx } from "@/contexts/LocationContext";
 
 type LiveCall = {
   id: string;
@@ -52,6 +53,7 @@ const ranges = [
 const Calls = () => {
   const isNew = useIsNewCustomer();
   const { companyId } = useAuth();
+  const { active } = useLocationCtx();
   const [calls, setCalls] = useState<LiveCall[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -64,10 +66,12 @@ const Calls = () => {
     let cancelled = false;
 
     const load = async () => {
-      const { data } = await supabase
+      let q = supabase
         .from("calls")
         .select("id, caller, phone, started_at, duration_sec, status, summary, tag")
-        .eq("company_id", companyId)
+        .eq("company_id", companyId);
+      if (active !== "all") q = q.eq("to_number", active.address);
+      const { data } = await q
         .order("started_at", { ascending: false })
         .limit(200);
       if (cancelled) return;
@@ -100,7 +104,7 @@ const Calls = () => {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [companyId]);
+  }, [companyId, active]);
 
   const [filter, setFilter] = useState<(typeof filters)[number]["id"]>("all");
   const [tag, setTag] = useState<"any" | CallTag>("any");
