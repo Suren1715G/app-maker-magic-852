@@ -43,10 +43,10 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 glass-strong safe-bottom border-t border-border/60">
+    <nav data-tour="bottom-nav" className="fixed bottom-0 left-0 right-0 z-40 glass-strong safe-bottom border-t border-border/60">
       <ul className="grid grid-cols-5 max-w-md md:max-w-3xl lg:max-w-5xl mx-auto">
         {primary.map(({ to, label, icon: Icon }) => (
-          <li key={to}>
+          <li key={to} data-tour={`nav-${to === "/" ? "home" : to.slice(1)}`}>
             <NavLink
               to={to}
               end={to === "/"}
@@ -72,6 +72,7 @@ export function BottomNav() {
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <button
+                data-tour="nav-more"
                 className={cn(
                   "w-full flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors",
                   moreActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
