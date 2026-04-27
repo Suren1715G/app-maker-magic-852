@@ -18,6 +18,7 @@ import { calls, bookings, sms } from "@/data/mock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { GoogleReviewsPanel } from "@/components/app/GoogleReviewsPanel";
 
 type Detail = {
   id: string;
@@ -425,6 +426,10 @@ const MasterCompanyDetail = () => {
               </ul>
             </section>
           </div>
+          <section className="mt-6">
+            <h2 className="font-display text-base font-semibold mb-3">Google Reviews</h2>
+            <GoogleReviewsPanel companyId={detail.id} canManage={true} />
+          </section>
         </div>
       )}
     </MasterShell>
