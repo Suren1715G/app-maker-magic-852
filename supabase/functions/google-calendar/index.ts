@@ -1,9 +1,20 @@
 // Server-side Google Calendar proxy with auto token refresh.
+//
+// Each user connects their own Google account (tokens in user_google_tokens).
+// Each company can additionally designate ONE shared "company calendar":
+// a specific calendar inside the connecting user's Google account that the
+// whole team reads/writes to. Backend transparently uses that owner's tokens
+// for everyone in the company.
+//
 // Routes:
-//   GET  ?action=status         -> { connected, email }
-//   GET  ?action=events&...     -> upcoming events (timeMin defaults to now)
-//   POST { action:"create", event:{...} } -> insert event
-//   POST { action:"disconnect" } -> revoke + delete row
+//   GET  ?action=status                          -> { connected, email, company:{...} }
+//   GET  ?action=events&...                      -> upcoming events (company shared calendar if set)
+//   POST { action:"create", event:{...} }        -> insert event (company shared calendar if set)
+//   POST { action:"disconnect" }                 -> revoke + delete row
+//   POST { action:"list_my_calendars" }          -> caller's own Google calendars (for the picker)
+//   POST { action:"set_shared_calendar",
+//          calendarId, calendarSummary }         -> mark this calendar as the company's shared one
+//   POST { action:"clear_shared_calendar" }      -> unset the company shared calendar
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -76,19 +87,127 @@ Deno.serve(async (req) => {
       action = body.action ?? action;
     }
 
+    // Caller's own Google connection (may be null)
     const { data: row } = await admin
       .from("user_google_tokens")
       .select("*")
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (action === "status") {
-      return json({ connected: !!row, email: row?.google_email ?? null });
+    // Caller's company + shared-calendar info (may be null)
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("company_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const companyId = profile?.company_id ?? null;
+
+    let companyShared:
+      | {
+          calendar_id: string | null;
+          calendar_summary: string | null;
+          owner_user_id: string | null;
+          owner_email: string | null;
+          access_token: string | null;
+          refresh_token: string | null;
+          expires_at: string | null;
+        }
+      | null = null;
+    if (companyId) {
+      const { data: companyRow } = await admin.rpc(
+        "get_company_calendar_connection",
+        { _company_id: companyId },
+      );
+      if (Array.isArray(companyRow) && companyRow.length > 0) {
+        companyShared = companyRow[0];
+      }
     }
 
-    if (!row) return json({ error: "not_connected" }, 400);
+    const sharedCalendarId = companyShared?.calendar_id ?? null;
+    const sharedOwnerUserId = companyShared?.owner_user_id ?? null;
+    const sharedConfigured = Boolean(sharedCalendarId && sharedOwnerUserId);
+
+    if (action === "status") {
+      return json({
+        connected: !!row,
+        email: row?.google_email ?? null,
+        company: companyId
+          ? {
+              shared_configured: sharedConfigured,
+              calendar_id: sharedCalendarId,
+              calendar_summary: companyShared?.calendar_summary ?? null,
+              owner_email: companyShared?.owner_email ?? null,
+              is_owner: sharedOwnerUserId === userId,
+              owner_token_present: Boolean(companyShared?.access_token),
+            }
+          : null,
+      });
+    }
+
+    if (action === "list_my_calendars") {
+      if (!row) return json({ error: "not_connected" }, 400);
+      const accessToken = await refreshIfNeeded(admin, row);
+      const res = await fetch(
+        "https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=writer&maxResults=250",
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      const data = await res.json();
+      if (!res.ok) return json({ error: data }, res.status);
+      const items = (data.items ?? []).map((c: any) => ({
+        id: c.id,
+        summary: c.summary,
+        primary: !!c.primary,
+        accessRole: c.accessRole,
+      }));
+      return json({ items });
+    }
+
+    if (action === "set_shared_calendar") {
+      if (!companyId) return json({ error: "no_company" }, 400);
+      if (!row) return json({ error: "not_connected" }, 400);
+      const calendarId = body.calendarId as string | undefined;
+      const calendarSummary = (body.calendarSummary as string | undefined) ?? null;
+      if (!calendarId) return json({ error: "Missing calendarId" }, 400);
+      const { error: upErr } = await admin
+        .from("companies")
+        .update({
+          shared_calendar_id: calendarId,
+          shared_calendar_summary: calendarSummary,
+          shared_calendar_owner_user_id: userId,
+        })
+        .eq("id", companyId);
+      if (upErr) return json({ error: upErr.message }, 500);
+      return json({ ok: true });
+    }
+
+    if (action === "clear_shared_calendar") {
+      if (!companyId) return json({ error: "no_company" }, 400);
+      const { error: upErr } = await admin
+        .from("companies")
+        .update({
+          shared_calendar_id: null,
+          shared_calendar_summary: null,
+          shared_calendar_owner_user_id: null,
+        })
+        .eq("id", companyId);
+      if (upErr) return json({ error: upErr.message }, 500);
+      return json({ ok: true });
+    }
 
     if (action === "disconnect") {
+      if (!row) return json({ error: "not_connected" }, 400);
+      // If this user is the company calendar owner, also clear it so the team
+      // doesn't keep pointing at a calendar with no working tokens.
+      if (companyId && sharedOwnerUserId === userId) {
+        await admin
+          .from("companies")
+          .update({
+            shared_calendar_id: null,
+            shared_calendar_summary: null,
+            shared_calendar_owner_user_id: null,
+          })
+          .eq("id", companyId);
+      }
       try {
         await fetch(`https://oauth2.googleapis.com/revoke?token=${row.refresh_token}`, { method: "POST" });
       } catch (_) { /* ignore */ }
@@ -96,10 +215,28 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
-    const accessToken = await refreshIfNeeded(admin, row);
+    // For events/create we prefer the company shared calendar (using the owner's
+    // tokens). If no shared calendar is set, fall back to the caller's own
+    // primary calendar — which requires the caller to be connected.
+    let accessToken: string;
+    let effectiveCalendarId: string;
+    if (sharedConfigured && companyShared?.access_token && companyShared.refresh_token && companyShared.expires_at) {
+      const ownerRow = {
+        user_id: sharedOwnerUserId!,
+        access_token: companyShared.access_token,
+        refresh_token: companyShared.refresh_token,
+        expires_at: companyShared.expires_at,
+      };
+      accessToken = await refreshIfNeeded(admin, ownerRow);
+      effectiveCalendarId = sharedCalendarId!;
+    } else {
+      if (!row) return json({ error: "not_connected" }, 400);
+      accessToken = await refreshIfNeeded(admin, row);
+      effectiveCalendarId = "primary";
+    }
 
     if (action === "events") {
-      const calendarId = url.searchParams.get("calendarId") ?? "primary";
+      const calendarId = url.searchParams.get("calendarId") ?? effectiveCalendarId;
       const timeMin = url.searchParams.get("timeMin") ?? new Date().toISOString();
       const timeMax = url.searchParams.get("timeMax") ?? undefined;
       const maxResults = url.searchParams.get("maxResults") ?? "50";
@@ -122,7 +259,7 @@ Deno.serve(async (req) => {
 
     if (action === "create") {
       const event = body.event;
-      const calendarId = body.calendarId ?? "primary";
+      const calendarId = body.calendarId ?? effectiveCalendarId;
       if (!event) return json({ error: "Missing event" }, 400);
       const res = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
