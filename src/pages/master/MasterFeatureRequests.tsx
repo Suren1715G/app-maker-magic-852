@@ -35,6 +35,7 @@ const MasterFeatureRequests = () => {
   const [reqs, setReqs] = useState<Req[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -70,9 +71,17 @@ const MasterFeatureRequests = () => {
   }, []);
 
   const updateStatus = async (id: string, status: string) => {
+    setUpdatingId(id);
     const { error } = await supabase.from("feature_requests").update({ status }).eq("id", id);
-    if (error) toast.error(error.message);
-    else toast.success(`Marked ${status}`);
+    setUpdatingId(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    setReqs((current) => current.map((r) => r.id === id ? { ...r, status } : r));
+    setFilter(status);
+    toast.success(`Marked ${status}`);
   };
 
   const updateNotes = async (id: string, admin_notes: string) => {
@@ -153,12 +162,14 @@ const MasterFeatureRequests = () => {
                   <button
                     key={s}
                     onClick={() => updateStatus(r.id, s)}
-                    disabled={r.status === s}
+                    disabled={r.status === s || updatingId === r.id}
                     className={cn(
                       "text-[11px] rounded-full px-2.5 py-1 border transition-colors capitalize",
                       r.status === s
                         ? "border-primary bg-primary/10 text-primary cursor-default"
-                        : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                        : updatingId === r.id
+                          ? "border-border text-muted-foreground/60 cursor-wait"
+                          : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
                     )}
                   >
                     {s}
