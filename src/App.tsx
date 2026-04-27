@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { DemoModeProvider } from "@/contexts/DemoModeContext";
 import { LocationProvider } from "@/contexts/LocationContext";
+import { TourProvider } from "@/contexts/TourContext";
 import { ProtectedRoute } from "@/components/app/ProtectedRoute";
 import { AdminRoute } from "@/components/app/AdminRoute";
 import { ReceptionistWidget } from "@/components/app/ReceptionistWidget";
@@ -57,8 +58,9 @@ const App = () => (
         <AuthProvider>
           <DemoModeProvider>
             <LocationProvider>
-              <PersistentReceptionist />
-              <Routes>
+              <TourProvider>
+                <PersistentReceptionist />
+                <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/claim" element={<ClaimCode />} />
 
@@ -87,7 +89,8 @@ const App = () => (
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
-              </Routes>
+                </Routes>
+              </TourProvider>
             </LocationProvider>
           </DemoModeProvider>
         </AuthProvider>
