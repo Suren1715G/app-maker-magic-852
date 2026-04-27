@@ -2,88 +2,110 @@ import { createContext, useContext, useEffect, useState, ReactNode, useMemo } fr
 import { locations as mockLocations, type Location } from "@/data/mock";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemoMode } from "@/contexts/DemoModeContext";
+import { supabase } from "@/integrations/supabase/client";
 
 type Value = {
   active: Location | "all";
   setActive: (l: Location | "all") => void;
   list: Location[];
-  addLocation: (input: { name: string; address: string }) => void;
-  removeLocation: (id: string) => void;
   isDemo: boolean;
+  loading: boolean;
 };
 
 const Ctx = createContext<Value | undefined>(undefined);
 
-const storageKey = (uid: string | null | undefined) => `sgs.locations.${uid ?? "anon"}`;
+const activeKey = (uid: string | null | undefined) => `sgs.locations.active.${uid ?? "anon"}`;
 
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, companyId } = useAuth();
   const { demoMode } = useDemoMode();
-  const isDemo = demoMode; // admins viewing customer demo see mock data
+  const isDemo = demoMode;
 
-  const [userList, setUserList] = useState<Location[]>([]);
-  const [active, setActive] = useState<Location | "all">("all");
+  const [realList, setRealList] = useState<Location[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [active, setActiveState] = useState<Location | "all">("all");
 
-  // Load user-owned list from localStorage on user change
-  useEffect(() => {
-    if (isDemo) return;
+  // Persist the user's active selection across reloads.
+  const setActive: Value["setActive"] = (l) => {
+    setActiveState(l);
     try {
-      const raw = localStorage.getItem(storageKey(user?.id));
-      const parsed: Location[] = raw ? JSON.parse(raw) : [];
-      setUserList(parsed);
-      setActive(parsed[0] ?? "all");
-    } catch {
-      setUserList([]);
-      setActive("all");
-    }
-  }, [user?.id, isDemo]);
-
-  // Persist
-  useEffect(() => {
-    if (isDemo) return;
-    try {
-      localStorage.setItem(storageKey(user?.id), JSON.stringify(userList));
+      localStorage.setItem(activeKey(user?.id), l === "all" ? "all" : l.id);
     } catch {
       /* ignore */
     }
-  }, [userList, user?.id, isDemo]);
+  };
 
-  const list = useMemo<Location[]>(() => (isDemo ? mockLocations : userList), [isDemo, userList]);
-
-  // Keep active valid as list changes
+  // Load real locations from approved phone numbers (one row per location).
   useEffect(() => {
-    if (active === "all") return;
-    if (!list.some((l) => l.id === active.id)) {
-      setActive(list[0] ?? "all");
+    if (isDemo) return;
+    if (!companyId) {
+      setRealList([]);
+      return;
     }
-  }, [list, active]);
 
-  const addLocation: Value["addLocation"] = ({ name, address }) => {
-    const loc: Location = {
-      id: `loc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      name: name.trim(),
-      address: address.trim(),
-      callsToday: 0,
-      bookingsToday: 0,
-      isPrimary: userList.length === 0,
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from("company_phone_numbers")
+        .select("id, label, phone_number, status, created_at")
+        .eq("company_id", companyId)
+        .eq("status", "active")
+        .order("created_at", { ascending: true });
+      if (cancelled) return;
+      const rows = (data ?? []).map<Location>((r, i) => ({
+        id: r.id,
+        name: r.label?.trim() || `Location ${i + 1}`,
+        address: r.phone_number,
+        callsToday: 0,
+        bookingsToday: 0,
+        isPrimary: i === 0,
+      }));
+      setRealList(rows);
+      setLoading(false);
     };
-    setUserList((p) => [...p, loc]);
-    setActive(loc);
-  };
+    load();
 
-  const removeLocation: Value["removeLocation"] = (id) => {
-    setUserList((p) => {
-      const next = p.filter((l) => l.id !== id);
-      // Make sure exactly one primary remains if any exist
-      if (next.length && !next.some((l) => l.isPrimary)) {
-        next[0] = { ...next[0], isPrimary: true };
+    // Refresh when phone numbers change (owner activates a new one).
+    const channel = supabase
+      .channel(`company_phone_numbers:${companyId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "company_phone_numbers", filter: `company_id=eq.${companyId}` },
+        () => load(),
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [companyId, isDemo]);
+
+  const list = useMemo<Location[]>(() => (isDemo ? mockLocations : realList), [isDemo, realList]);
+
+  // Restore the persisted selection when the list (or user) changes.
+  useEffect(() => {
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(activeKey(user?.id));
+    } catch {
+      /* ignore */
+    }
+    if (saved && saved !== "all") {
+      const match = list.find((l) => l.id === saved);
+      if (match) {
+        setActiveState(match);
+        return;
       }
-      return next;
-    });
-  };
+    }
+    // Default: combined dashboard ("all") whenever there are 2+ locations,
+    // otherwise focus the only location so the dashboard isn't empty.
+    setActiveState(list.length === 1 ? list[0] : "all");
+  }, [list, user?.id]);
 
   return (
-    <Ctx.Provider value={{ active, setActive, list, addLocation, removeLocation, isDemo }}>
+    <Ctx.Provider value={{ active, setActive, list, isDemo, loading }}>
       {children}
     </Ctx.Provider>
   );
