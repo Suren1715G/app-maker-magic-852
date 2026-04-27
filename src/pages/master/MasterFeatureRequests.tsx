@@ -147,7 +147,8 @@ const MasterFeatureRequests = () => {
                 </span>
               </div>
 
-              <div className="flex flex-wrap gap-1.5 mb-3">
+              <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground mr-1">Set status:</span>
                 {STATUSES.map((s) => (
                   <button
                     key={s}
