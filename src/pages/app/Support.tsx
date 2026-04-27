@@ -207,14 +207,21 @@ const Support = () => {
 
         {/* Messages */}
         <div className="px-4 py-4 space-y-3 max-h-[55vh] overflow-y-auto">
-          {!activeId && (
-            <div className="text-center text-sm text-muted-foreground py-8">
-              No conversations yet. Start one above and our team will reply here.
-            </div>
-          )}
-          {activeId && messages.length === 0 && (
-            <div className="text-center text-sm text-muted-foreground py-6">
-              Say hi 👋 — send your first message below.
+          {(!activeId || messages.length === 0) && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] rounded-2xl rounded-bl-md px-3.5 py-3 text-sm glass border border-primary/10 space-y-2">
+                <div className="font-medium">Hello 👋 How can we help you?</div>
+                <div className="text-muted-foreground">
+                  We usually get back to you within <span className="text-foreground font-medium">24 hours</span>.
+                </div>
+                <div className="text-muted-foreground text-xs pt-1 border-t border-border/50 space-y-0.5">
+                  <div>📞 <a href="tel:+15088102288" className="text-foreground hover:text-primary">(508) 810-2288</a></div>
+                  <div>✉️ <a href="mailto:sgsaireception@gmail.com" className="text-foreground hover:text-primary">sgsaireception@gmail.com</a></div>
+                </div>
+                {!activeId && (
+                  <div className="text-[11px] text-muted-foreground pt-1">Start a new conversation above to begin chatting.</div>
+                )}
+              </div>
             </div>
           )}
           {messages.map((m) => (
