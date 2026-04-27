@@ -121,7 +121,7 @@ const MasterSupport = () => {
 
   return (
     <MasterShell title="Support inbox" subtitle="Reply to customer conversations from one place.">
-      <div className="grid md:grid-cols-[320px_1fr] gap-4 min-h-[60vh]">
+      <div className="grid md:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-220px)] min-h-[500px]">
         {/* Conversation list */}
         <aside className="glass rounded-2xl overflow-hidden flex flex-col">
           <div className="px-4 py-3 border-b border-border/60 flex items-center gap-2">

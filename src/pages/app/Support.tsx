@@ -206,7 +206,7 @@ const Support = () => {
         </div>
 
         {/* Messages */}
-        <div className="px-4 py-4 space-y-3 max-h-[55vh] overflow-y-auto">
+        <div className="px-4 py-4 space-y-3 h-[60vh] min-h-[400px] overflow-y-auto">
           {(!activeId || messages.length === 0) && (
             <div className="flex justify-start">
               <div className="max-w-[85%] rounded-2xl rounded-bl-md px-3.5 py-3 text-sm glass border border-primary/10 space-y-2">
