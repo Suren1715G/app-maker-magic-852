@@ -91,7 +91,7 @@ export function TourOverlay({ step, stepIndex, totalSteps, onNext, onPrev, onSki
     <div className="fixed inset-0 z-[100] pointer-events-none" aria-live="polite">
       {/* Backdrop with cutout */}
       {rect ? (
-        <svg className="absolute inset-0 w-full h-full pointer-events-auto" onClick={onSkip}>
+        <svg className="absolute inset-0 w-full h-full pointer-events-auto">
           <defs>
             <mask id="tour-cutout">
               <rect width="100%" height="100%" fill="white" />
@@ -121,7 +121,7 @@ export function TourOverlay({ step, stepIndex, totalSteps, onNext, onPrev, onSki
           />
         </svg>
       ) : (
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm pointer-events-auto" onClick={onSkip} />
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm pointer-events-auto" />
       )}
 
       {/* Tooltip card */}
