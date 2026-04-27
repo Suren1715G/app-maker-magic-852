@@ -45,7 +45,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 export function PageHeader({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
   return (
-    <header className="flex items-end justify-between pt-4 pb-6">
+    <header data-tour="page-header" className="flex items-end justify-between pt-4 pb-6">
       <div>
         <h1 className="font-display text-3xl font-semibold leading-tight">{title}</h1>
         {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
