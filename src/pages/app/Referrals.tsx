@@ -77,8 +77,10 @@ const SectionHeading = ({ plain, accent }: { plain: string; accent: string }) =>
 const Referrals = () => {
   const isNew = useIsNewCustomer();
   const { user } = useAuth();
-  const referrals = isNew ? [] : mockReferrals;
-  const earned = referrals.filter((r) => r.status === "joined").length;
+  // Live referral counts from the database. Only "qualified" referrals
+  // (the referred user actually paid for a subscription) count toward discounts.
+  const [earned, setEarned] = useState(0);
+  const [pending, setPending] = useState(0);
 
   // Each user has a unique referral code stored in the database.
   const [refCode, setRefCode] = useState<string | null>(null);
@@ -95,6 +97,29 @@ const Referrals = () => {
         .eq("user_id", user.id)
         .maybeSingle();
       if (!cancelled) setRefCode(data?.code ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  // Load this user's referrals (qualified vs pending counts).
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id) {
+      setEarned(0);
+      setPending(0);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("referrals")
+        .select("status")
+        .eq("referrer_user_id", user.id);
+      if (cancelled) return;
+      const rows = data ?? [];
+      setEarned(rows.filter((r) => r.status === "qualified").length);
+      setPending(rows.filter((r) => r.status === "pending").length);
     })();
     return () => {
       cancelled = true;
