@@ -42,6 +42,12 @@ const Auth = () => {
       setAccessCode(code.toUpperCase());
       setMode("signup");
     }
+    // Capture referral code from link (?ref=ABC12345) and stash for signup
+    const ref = params.get("ref");
+    if (ref) {
+      try { sessionStorage.setItem("pending_referral_code", ref.toUpperCase()); } catch {}
+      setMode("signup");
+    }
   }, []);
 
   if (loading) {
@@ -62,6 +68,8 @@ const Auth = () => {
         if (!accessCode.trim()) {
           throw new Error("An access code is required to create an account.");
         }
+        let pendingRef: string | null = null;
+        try { pendingRef = sessionStorage.getItem("pending_referral_code"); } catch {}
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -71,10 +79,12 @@ const Auth = () => {
               display_name: displayName || null,
               business_name: businessName || null,
               access_code: accessCode.trim(),
+              referral_code: pendingRef,
             },
           },
         });
         if (error) throw error;
+        try { sessionStorage.removeItem("pending_referral_code"); } catch {}
         toast.success("Account created — you're signed in.");
         navigate("/", { replace: true });
       } else {
