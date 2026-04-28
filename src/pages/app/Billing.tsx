@@ -79,7 +79,9 @@ const Billing = () => {
           <div>
             <div className="text-xs uppercase tracking-wider text-primary">Current plan</div>
             <div className="font-display text-2xl font-semibold mt-1">{current.name}</div>
-            <div className="text-sm text-muted-foreground">${current.price} / month · billed monthly</div>
+            <div className="text-sm text-muted-foreground">
+              {current.price > 0 ? `$${current.price} / month · billed monthly` : "Custom pricing"}
+            </div>
           </div>
           <Sparkles className="h-8 w-8 text-primary" />
         </div>
@@ -136,7 +138,9 @@ const Billing = () => {
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground">${p.price} / month</div>
+                <div className="text-xs text-muted-foreground">
+                  {p.price > 0 ? `$${p.price} / month` : "Contact us"}
+                </div>
               </div>
             </div>
             <ul className="space-y-1 text-xs text-foreground/75">
