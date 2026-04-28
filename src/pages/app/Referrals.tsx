@@ -80,6 +80,7 @@ const Referrals = () => {
   // (the referred user actually paid for a subscription) count toward discounts.
   const [earned, setEarned] = useState(0);
   const [pending, setPending] = useState(0);
+  const [referrals, setReferrals] = useState<Array<{ id: string; status: string; created_at: string; referred_user_id: string }>>([]);
 
   // Each user has a unique referral code stored in the database.
   const [refCode, setRefCode] = useState<string | null>(null);
@@ -113,10 +114,12 @@ const Referrals = () => {
     (async () => {
       const { data } = await supabase
         .from("referrals")
-        .select("status")
-        .eq("referrer_user_id", user.id);
+        .select("id, status, created_at, referred_user_id")
+        .eq("referrer_user_id", user.id)
+        .order("created_at", { ascending: false });
       if (cancelled) return;
       const rows = data ?? [];
+      setReferrals(rows);
       setEarned(rows.filter((r) => r.status === "qualified").length);
       setPending(rows.filter((r) => r.status === "pending").length);
     })();
