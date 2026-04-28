@@ -531,6 +531,39 @@ export type Database = {
         }
         Relationships: []
       }
+      referrals: {
+        Row: {
+          created_at: string
+          id: string
+          qualified_at: string | null
+          referral_code: string
+          referred_user_id: string
+          referrer_user_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          qualified_at?: string | null
+          referral_code: string
+          referred_user_id: string
+          referrer_user_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          qualified_at?: string | null
+          referral_code?: string
+          referred_user_id?: string
+          referrer_user_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reviews: {
         Row: {
           comment: string | null
@@ -829,6 +862,14 @@ export type Database = {
         Returns: boolean
       }
       lookup_referral_code: { Args: { _code: string }; Returns: string }
+      mark_referral_qualified: {
+        Args: { _referred_user_id: string }
+        Returns: boolean
+      }
+      record_referral: {
+        Args: { _code: string; _referred_user_id: string }
+        Returns: undefined
+      }
       redeem_access_code: {
         Args: { _code: string; _user_id: string }
         Returns: string
