@@ -461,16 +461,15 @@ const Referrals = () => {
                 {referrals.map((r) => (
                   <li key={r.id} className="flex items-center justify-between px-4 py-3.5">
                     <div>
-                      <div className="text-sm font-medium">{r.name}</div>
+                      <div className="text-sm font-medium">Referred user</div>
                       <div className="text-[11px] text-muted-foreground">
-                        {new Date(r.at).toLocaleDateString()}
+                        {new Date(r.created_at).toLocaleDateString()}
                       </div>
                     </div>
                     <span
                       className={cn(
                         "text-[11px] px-2 py-0.5 rounded-full capitalize",
-                        r.status === "joined" && "bg-success/15 text-success",
-                        r.status === "trial" && "bg-primary/15 text-primary",
+                        r.status === "qualified" && "bg-success/15 text-success",
                         r.status === "pending" && "bg-muted text-muted-foreground"
                       )}
                     >
