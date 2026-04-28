@@ -1,14 +1,48 @@
 import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { invoices as mockInvoices } from "@/data/mock";
 import { fmtMoney } from "@/lib/format";
-import { Check, Download, Sparkles } from "lucide-react";
+import { Check, Download, Sparkles, ExternalLink, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 
+const PLANS = [
+  {
+    name: "Starter",
+    price: 149,
+    features: ["Up to 200 AI calls/mo", "SMS confirmations", "Google Calendar sync", "Email support"],
+  },
+  {
+    name: "Pro",
+    price: 250,
+    current: true,
+    features: [
+      "Unlimited AI calls",
+      "SMS confirmations",
+      "Google Calendar sync",
+      "Lead CRM",
+      "Analytics & reports",
+      "Priority support",
+    ],
+  },
+  {
+    name: "Business",
+    price: 499,
+    features: [
+      "Everything in Pro",
+      "Multi-location support",
+      "Custom AI voice & prompts",
+      "Dedicated account manager",
+    ],
+  },
+] as const;
+
+const MANAGE_BILLING_URL = "https://app-maker-magic-852.lovable.app/billing"; // TODO: replace with your real billing portal URL
+
 const Billing = () => {
   const isNew = useIsNewCustomer();
   const invoices = isNew ? [] : mockInvoices;
+  const current = PLANS.find((p) => p.current)!;
   return (
     <AppShell>
       <PageHeader title="Billing" subtitle="Simple, all-inclusive pricing." />
@@ -17,13 +51,13 @@ const Billing = () => {
         <div className="flex items-center justify-between">
           <div>
             <div className="text-xs uppercase tracking-wider text-primary">Current plan</div>
-            <div className="font-display text-2xl font-semibold mt-1">Pro</div>
-            <div className="text-sm text-muted-foreground">$149 / month · billed monthly</div>
+            <div className="font-display text-2xl font-semibold mt-1">{current.name}</div>
+            <div className="text-sm text-muted-foreground">${current.price} / month · billed monthly</div>
           </div>
           <Sparkles className="h-8 w-8 text-primary" />
         </div>
         <ul className="mt-4 space-y-1.5 text-sm">
-          {["Unlimited AI calls", "SMS confirmations", "Google Calendar sync", "Lead CRM", "Analytics & reports"].map((f) => (
+          {current.features.map((f) => (
             <li key={f} className="flex items-center gap-2 text-foreground/80">
               <Check className="h-4 w-4 text-success" /> {f}
             </li>
@@ -32,20 +66,61 @@ const Billing = () => {
         <div className="text-xs text-muted-foreground mt-4">Next payment: <span className="text-foreground">Dec 4, 2025</span></div>
       </div>
 
-      <div data-tour="billing-actions" className="grid grid-cols-2 gap-2 mb-6">
-        <Button variant="outline" onClick={() => toast.info("Plan options coming soon")}>Change plan</Button>
-        <Button
-          variant="outline"
-          onClick={() =>
-            toast("Wait — get 50% off for 2 months?", {
-              action: { label: "Stay", onClick: () => toast.success("Discount applied 🎉") },
-              cancel: { label: "Cancel anyway", onClick: () => toast.info("We're sorry to see you go.") },
-              duration: 8000,
-            })
-          }
-        >
-          Cancel
-        </Button>
+      {/* Plan management notice + CTA */}
+      <div data-tour="billing-actions" className="glass rounded-2xl p-4 mb-6 border border-primary/20">
+        <div className="flex items-start gap-3">
+          <div className="h-9 w-9 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+            <Lock className="h-4 w-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-display font-semibold text-sm">Plan changes happen on our website</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              To upgrade, downgrade, or cancel your subscription, please manage it from your billing portal on our website.
+            </p>
+            <Button
+              size="sm"
+              className="mt-3"
+              onClick={() => window.open(MANAGE_BILLING_URL, "_blank", "noopener,noreferrer")}
+            >
+              Manage on website <ExternalLink className="h-3.5 w-3.5 ml-1" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Read-only plan comparison */}
+      <h2 className="font-display text-lg font-semibold mb-3">All plans</h2>
+      <div className="grid grid-cols-1 gap-3 mb-8">
+        {PLANS.map((p) => (
+          <div
+            key={p.name}
+            className={cn(
+              "glass rounded-2xl p-4",
+              p.current && "gradient-border ring-1 ring-primary/30"
+            )}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <div className="font-display text-lg font-semibold flex items-center gap-2">
+                  {p.name}
+                  {p.current && (
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                      Current
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground">${p.price} / month</div>
+              </div>
+            </div>
+            <ul className="space-y-1 text-xs text-foreground/75">
+              {p.features.map((f) => (
+                <li key={f} className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-success shrink-0" /> {f}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
 
       <h2 data-tour="billing-invoices-heading" className="font-display text-lg font-semibold mb-3">Invoice history</h2>
