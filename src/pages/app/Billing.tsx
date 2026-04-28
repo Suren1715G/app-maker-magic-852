@@ -17,30 +17,49 @@ type Plan = {
 const PLANS: Plan[] = [
   {
     name: "Starter",
-    price: 149,
-    features: ["Up to 200 AI calls/mo", "SMS confirmations", "Google Calendar sync", "Email support"],
-  },
-  {
-    name: "Pro",
-    price: 250,
-    current: true,
+    price: 199,
     features: [
-      "Unlimited AI calls",
-      "SMS confirmations",
-      "Google Calendar sync",
-      "Lead CRM",
-      "Analytics & reports",
-      "Priority support",
+      "100 AI calls per month",
+      "Up to 500 contacts in your client list",
+      "125 SMS per month",
+      "125 emails per month",
+      "SMS & email marketing",
+      "SMS appointment confirmations",
+      "Calendar sync (Google, Apple, Outlook)",
+      "Schedule, reschedule & cancel appointments",
+      "Full app & dashboard customized to your business",
+      "Built-in calendar in your dashboard",
+      "Analytics & reporting",
     ],
   },
   {
-    name: "Business",
-    price: 499,
+    name: "Pro",
+    price: 269,
+    current: true,
     features: [
-      "Everything in Pro",
-      "Multi-location support",
-      "Custom AI voice & prompts",
-      "Dedicated account manager",
+      "200 AI calls per month",
+      "Up to 1,000 contacts in your client list",
+      "250 SMS per month",
+      "250 emails per month",
+      "SMS & email marketing",
+      "SMS appointment confirmations",
+      "Calendar sync (Google, Apple, Outlook)",
+      "Schedule, reschedule & cancel appointments",
+      "Full app & dashboard customized to your business",
+      "Built-in calendar in your dashboard",
+      "Analytics & reporting",
+    ],
+  },
+  {
+    name: "Enterprise",
+    price: 0,
+    features: [
+      "Unlimited AI calls",
+      "Unlimited contacts",
+      "Custom SMS & email volume",
+      "Multi-location & team support",
+      "CRM & custom integrations",
+      "Priority SLA & support",
     ],
   },
 ];
@@ -60,7 +79,9 @@ const Billing = () => {
           <div>
             <div className="text-xs uppercase tracking-wider text-primary">Current plan</div>
             <div className="font-display text-2xl font-semibold mt-1">{current.name}</div>
-            <div className="text-sm text-muted-foreground">${current.price} / month · billed monthly</div>
+            <div className="text-sm text-muted-foreground">
+              {current.price > 0 ? `$${current.price} / month · billed monthly` : "Custom pricing"}
+            </div>
           </div>
           <Sparkles className="h-8 w-8 text-primary" />
         </div>
@@ -117,7 +138,9 @@ const Billing = () => {
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground">${p.price} / month</div>
+                <div className="text-xs text-muted-foreground">
+                  {p.price > 0 ? `$${p.price} / month` : "Contact us"}
+                </div>
               </div>
             </div>
             <ul className="space-y-1 text-xs text-foreground/75">
