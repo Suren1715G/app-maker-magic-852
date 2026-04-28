@@ -23,6 +23,26 @@ const Home = () => {
   const { companyId } = useAuth();
   const { active } = useLocationCtx();
   const [liveCalls, setLiveCalls] = useState<LiveCall[]>([]);
+  const [companyName, setCompanyName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!companyId) {
+      setCompanyName(null);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("companies")
+      .select("name")
+      .eq("id", companyId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setCompanyName(data?.name ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
 
   useEffect(() => {
     if (!companyId) {
@@ -122,7 +142,7 @@ const Home = () => {
       <header className="pt-4 pb-6">
         <span className="text-muted-foreground text-sm block">Welcome back</span>
         <h1 className="font-display text-4xl font-semibold leading-none mt-1">
-          <span className="prism-text">SGS</span>
+          <span className="prism-text">{companyName ?? "Welcome"}</span>
         </h1>
         <p className="text-sm text-muted-foreground mt-2">Your AI receptionist is on the line.</p>
       </header>
