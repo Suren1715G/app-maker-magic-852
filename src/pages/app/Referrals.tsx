@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { referrals as mockReferrals } from "@/data/mock";
 import { Copy, Link2, Send, Sparkles, Share2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
