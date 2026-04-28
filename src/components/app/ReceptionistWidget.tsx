@@ -339,6 +339,7 @@ export function ReceptionistWidget() {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="Open Jarvis"
+        data-tour="jarvis-launcher"
         className={cn(
           "fixed bottom-24 right-4 z-40 h-12 w-12 rounded-full shadow-lg",
           "bg-gradient-to-br from-primary to-accent text-primary-foreground",

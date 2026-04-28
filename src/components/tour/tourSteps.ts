@@ -24,6 +24,9 @@ export const TOUR_STEPS: TourStep[] = [
   { route: "/", target: '[data-tour="home-next-booking"]', title: "Next booking", body: "Your soonest upcoming appointment, pulled straight from the calendar." },
   { route: "/", target: '[data-tour="home-recent-calls"]', title: "Recent calls", body: "The last few calls with quick summaries. Tap any one to see the full transcript." },
 
+  // ===== JARVIS LIVE =====
+  { route: "/", target: '[data-tour="jarvis-launcher"]', title: "Talk to Jarvis", body: "This floating button opens a live, hands-free conversation with your AI receptionist. Tap it any time to hear exactly what your callers hear — and try it out yourself." },
+
   // ===== NAV =====
   { route: "/", target: '[data-tour="bottom-nav"]', title: "Bottom navigation", body: "Your four main sections live here. Tap More for everything else." },
   { route: "/", target: '[data-tour="nav-more"]', title: "More menu", body: "Notes, Analytics, Billing, Referrals, Support and Settings all live behind this button." },
