@@ -5,8 +5,16 @@ import { Check, Download, Sparkles, ExternalLink, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
+import { cn } from "@/lib/utils";
 
-const PLANS = [
+type Plan = {
+  name: string;
+  price: number;
+  current?: boolean;
+  features: string[];
+};
+
+const PLANS: Plan[] = [
   {
     name: "Starter",
     price: 149,
@@ -35,7 +43,7 @@ const PLANS = [
       "Dedicated account manager",
     ],
   },
-] as const;
+];
 
 const MANAGE_BILLING_URL = "https://app-maker-magic-852.lovable.app/billing"; // TODO: replace with your real billing portal URL
 
