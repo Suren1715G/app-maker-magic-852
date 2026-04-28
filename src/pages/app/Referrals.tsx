@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { referrals as mockReferrals } from "@/data/mock";
 import { Copy, Link2, Send, Sparkles, Share2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -77,8 +76,11 @@ const SectionHeading = ({ plain, accent }: { plain: string; accent: string }) =>
 const Referrals = () => {
   const isNew = useIsNewCustomer();
   const { user } = useAuth();
-  const referrals = isNew ? [] : mockReferrals;
-  const earned = referrals.filter((r) => r.status === "joined").length;
+  // Live referral counts from the database. Only "qualified" referrals
+  // (the referred user actually paid for a subscription) count toward discounts.
+  const [earned, setEarned] = useState(0);
+  const [pending, setPending] = useState(0);
+  const [referrals, setReferrals] = useState<Array<{ id: string; status: string; created_at: string; referred_user_id: string }>>([]);
 
   // Each user has a unique referral code stored in the database.
   const [refCode, setRefCode] = useState<string | null>(null);
@@ -95,6 +97,31 @@ const Referrals = () => {
         .eq("user_id", user.id)
         .maybeSingle();
       if (!cancelled) setRefCode(data?.code ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  // Load this user's referrals (qualified vs pending counts).
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id) {
+      setEarned(0);
+      setPending(0);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("referrals")
+        .select("id, status, created_at, referred_user_id")
+        .eq("referrer_user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (cancelled) return;
+      const rows = data ?? [];
+      setReferrals(rows);
+      setEarned(rows.filter((r) => r.status === "qualified").length);
+      setPending(rows.filter((r) => r.status === "pending").length);
     })();
     return () => {
       cancelled = true;
@@ -434,16 +461,15 @@ const Referrals = () => {
                 {referrals.map((r) => (
                   <li key={r.id} className="flex items-center justify-between px-4 py-3.5">
                     <div>
-                      <div className="text-sm font-medium">{r.name}</div>
+                      <div className="text-sm font-medium">Referred user</div>
                       <div className="text-[11px] text-muted-foreground">
-                        {new Date(r.at).toLocaleDateString()}
+                        {new Date(r.created_at).toLocaleDateString()}
                       </div>
                     </div>
                     <span
                       className={cn(
                         "text-[11px] px-2 py-0.5 rounded-full capitalize",
-                        r.status === "joined" && "bg-success/15 text-success",
-                        r.status === "trial" && "bg-primary/15 text-primary",
+                        r.status === "qualified" && "bg-success/15 text-success",
                         r.status === "pending" && "bg-muted text-muted-foreground"
                       )}
                     >
