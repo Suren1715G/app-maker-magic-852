@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     if (!companyId) return json({ error: "Missing company_id" }, 400);
 
     if (body.action === "clear") {
-      const { error } = await admin.rpc("admin_clear_company_booking", { _company_id: companyId });
+      const { error } = await userClient.rpc("admin_clear_company_booking", { _company_id: companyId });
       if (error) return json({ error: error.message }, 500);
       return json({ ok: true });
     }
@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
       const userUri = me.resource?.uri ?? null;
       const schedulingUrl = me.resource?.scheduling_url ?? null;
 
-      const { error } = await admin.rpc("admin_set_company_calendly", {
+      const { error } = await userClient.rpc("admin_set_company_calendly", {
         _company_id: companyId,
         _access_token: token,
         _user_uri: userUri,
@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
       const me = await meRes.json();
       if (!meRes.ok) return json({ error: `Acuity creds invalid: ${JSON.stringify(me)}` }, 400);
 
-      const { error } = await admin.rpc("admin_set_company_acuity", {
+      const { error } = await userClient.rpc("admin_set_company_acuity", {
         _company_id: companyId,
         _user_id: userId,
         _api_key: apiKey,
