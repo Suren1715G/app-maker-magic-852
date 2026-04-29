@@ -935,6 +935,16 @@ export type Database = {
         Returns: undefined
       }
       claim_access_code: { Args: { _code: string }; Returns: string }
+      company_clear_booking: { Args: never; Returns: undefined }
+      company_set_acuity: {
+        Args: {
+          _api_key: string
+          _appointment_type_id: string
+          _scheduling_url: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
       generate_referral_code: { Args: never; Returns: string }
       get_company_calendar_connection: {
         Args: { _company_id: string }

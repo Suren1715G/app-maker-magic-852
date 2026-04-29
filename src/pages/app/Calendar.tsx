@@ -4,7 +4,7 @@ import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { bookings as mockBookings, type Booking } from "@/data/mock";
 import { fmtTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ChevronLeft, ChevronRight, Clock, MoreVertical, CalendarX, UserX, CalendarClock, Link2, Loader2, LogOut, Users } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock, MoreVertical, CalendarX, UserX, CalendarClock, Link2, Loader2, LogOut, Users, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,6 +86,100 @@ const Calendar = () => {
   const [myCalendars, setMyCalendars] = useState<Array<{ id: string; summary: string; primary: boolean }>>([]);
   const [pickerLoading, setPickerLoading] = useState(false);
 
+  // Booking provider (single source of truth from companies row)
+  type BookingRow = {
+    booking_provider: "google" | "acuity";
+    acuity_user_id: string | null;
+    acuity_scheduling_url: string | null;
+  };
+  const [booking, setBooking] = useState<BookingRow | null>(null);
+  const [acuOpen, setAcuOpen] = useState(false);
+  const [acuUser, setAcuUser] = useState("");
+  const [acuKey, setAcuKey] = useState("");
+  const [acuType, setAcuType] = useState("");
+  const [acuBusy, setAcuBusy] = useState(false);
+
+  const refreshBooking = async () => {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("company_id")
+      .maybeSingle();
+    if (!prof?.company_id) return;
+    const { data } = await supabase
+      .from("companies")
+      .select("booking_provider, acuity_user_id, acuity_scheduling_url")
+      .eq("id", prof.company_id)
+      .maybeSingle();
+    setBooking((data as BookingRow) ?? null);
+  };
+
+  const acuityActive = booking?.booking_provider === "acuity" && !!booking?.acuity_user_id;
+
+  const loadAcuityAppointments = async () => {
+    setGcalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("company-booking", {
+        body: { action: "list_acuity_appointments" },
+      });
+      if (error) throw new Error(error.message);
+      const mapped: Booking[] = (data?.items ?? []).map((a: any) => ({
+        id: a.id,
+        customer: a.customer,
+        service: a.service,
+        startsAt: a.startsAt,
+        durationMin: a.durationMin,
+        smsConfirmed: true,
+        status: a.status,
+      }));
+      setItems(mapped);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load Acuity appointments");
+    } finally {
+      setGcalLoading(false);
+    }
+  };
+
+  const connectAcuity = async () => {
+    if (!acuUser.trim() || !acuKey.trim()) {
+      toast.error("User ID and API Key required");
+      return;
+    }
+    setAcuBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("company-booking", {
+        body: {
+          action: "connect_acuity",
+          acuity_user_id: acuUser.trim(),
+          acuity_api_key: acuKey.trim(),
+          acuity_appointment_type_id: acuType.trim() || null,
+        },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message || "Failed");
+      toast.success("Squarespace (Acuity) connected. Google was disconnected.");
+      setAcuOpen(false);
+      setAcuUser(""); setAcuKey(""); setAcuType("");
+      await Promise.all([refreshBooking(), refreshStatus()]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to connect");
+    } finally {
+      setAcuBusy(false);
+    }
+  };
+
+  const disconnectAcuity = async () => {
+    if (!confirm("Disconnect Squarespace (Acuity)?")) return;
+    const { error } = await supabase.functions.invoke("company-booking", {
+      body: { action: "clear" },
+    });
+    if (error) {
+      toast.error("Failed to disconnect");
+      return;
+    }
+    toast.success("Disconnected");
+    await Promise.all([refreshBooking(), refreshStatus()]);
+    setItems(isNew ? [] : mockBookings);
+  };
+
   const refreshStatus = async () => {
     const { data, error } = await supabase.functions.invoke("google-calendar", {
       body: { action: "status" },
@@ -133,19 +228,24 @@ const Calendar = () => {
 
   useEffect(() => {
     refreshStatus();
+    refreshBooking();
   }, []);
 
   useEffect(() => {
-    // Show events whenever either: this user is connected, OR the company has
+    if (acuityActive) {
+      loadAcuityAppointments();
+      return;
+    }
+    // Show Google events whenever either: this user is connected, OR the company has
     // a shared calendar set (the backend will use the owner's tokens).
     const canLoad = gcalStatus?.connected || gcalStatus?.company?.shared_configured;
     if (canLoad) loadEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gcalStatus?.connected, gcalStatus?.company?.shared_configured]);
+  }, [gcalStatus?.connected, gcalStatus?.company?.shared_configured, acuityActive]);
 
   // Re-check status when window regains focus (after OAuth redirect tab closes)
   useEffect(() => {
-    const onFocus = () => refreshStatus();
+    const onFocus = () => { refreshStatus(); refreshBooking(); };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, []);
@@ -306,14 +406,25 @@ const Calendar = () => {
       <PageHeader
         title="Calendar"
         subtitle={
-          gcalStatus?.company?.shared_configured
+          acuityActive
+            ? `Synced with Squarespace (Acuity)${booking?.acuity_scheduling_url ? ` · ${booking.acuity_scheduling_url}` : ""}`
+            : gcalStatus?.company?.shared_configured
             ? `Company calendar: ${gcalStatus.company.calendar_summary ?? "Shared"} · owned by ${gcalStatus.company.owner_email ?? "teammate"}`
             : gcalStatus?.connected
               ? `Synced with ${gcalStatus.email ?? "Google Calendar"}.`
-              : "Connect your Google Calendar to see real events."
+              : "Connect Google Calendar or Squarespace (Acuity) to see real events."
         }
         right={
-          gcalStatus?.connected ? (
+          acuityActive ? (
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <Badge variant="secondary" className="gap-1.5">
+                <CalendarDays className="h-3 w-3 text-success" /> Squarespace (Acuity)
+              </Badge>
+              <Button variant="ghost" size="sm" onClick={disconnectAcuity} aria-label="Disconnect Acuity">
+                <LogOut className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ) : gcalStatus?.connected ? (
             <div className="flex items-center gap-2 flex-wrap justify-end">
               {gcalStatus.company?.shared_configured ? (
                 <Badge variant="secondary" className="gap-1.5">
@@ -341,20 +452,26 @@ const Calendar = () => {
               <Users className="h-3 w-3 text-success" /> Company calendar
             </Badge>
           ) : (
-            <Button size="sm" onClick={startConnect} disabled={connecting}>
-              {connecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
-              Connect Google Calendar
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <Button size="sm" onClick={startConnect} disabled={connecting}>
+                {connecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
+                Connect Google
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setAcuOpen(true)}>
+                <CalendarDays className="h-3.5 w-3.5" />
+                Connect Squarespace
+              </Button>
+            </div>
           )
         }
       />
 
-      {gcalStatus && !gcalStatus.connected && !gcalStatus.company?.shared_configured && (
+      {gcalStatus && !acuityActive && !gcalStatus.connected && !gcalStatus.company?.shared_configured && (
         <div className="glass rounded-2xl p-4 mb-4 border border-dashed">
           <div className="text-sm">
             <div className="font-medium mb-1">Showing demo events</div>
             <div className="text-muted-foreground">
-              Connect your Google account, or ask a teammate to set the company calendar, to see real events here.
+              Connect Google Calendar or Squarespace (Acuity) to see real events here. Only one provider can be active at a time.
             </div>
           </div>
         </div>
@@ -415,6 +532,40 @@ const Calendar = () => {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setPickerOpen(false)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={acuOpen} onOpenChange={setAcuOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Connect Squarespace Scheduling (Acuity)</DialogTitle>
+            <DialogDescription>
+              In your Acuity / Squarespace Scheduling account: Integrations → API → copy the
+              User ID and API Key. Connecting Acuity will disconnect Google Calendar — only
+              one provider can be active at a time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground">User ID</label>
+              <Input value={acuUser} onChange={(e) => setAcuUser(e.target.value)} placeholder="123456" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">API Key</label>
+              <Input value={acuKey} onChange={(e) => setAcuKey(e.target.value)} placeholder="abcd1234..." />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Appointment Type ID (optional)</label>
+              <Input value={acuType} onChange={(e) => setAcuType(e.target.value)} placeholder="789012" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAcuOpen(false)} disabled={acuBusy}>Cancel</Button>
+            <Button onClick={connectAcuity} disabled={acuBusy}>
+              {acuBusy && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+              Connect
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
