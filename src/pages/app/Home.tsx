@@ -3,7 +3,7 @@ import { StatCard } from "@/components/app/StatCard";
 import { calls as mockCalls, bookings as mockBookings, stats as mockStats, leads as mockLeads, notifications as mockNotifications } from "@/data/mock";
 import { fmtDay, fmtMoney, fmtRel, fmtTime } from "@/lib/format";
 import { Link } from "react-router-dom";
-import { ArrowRight, CalendarDays, Phone, Sparkles, Clock, Users } from "lucide-react";
+import { ArrowRight, CalendarDays, Phone, Sparkles, Clock } from "lucide-react";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -185,7 +185,6 @@ const Home = () => {
       <div data-tour="home-stats" className="grid grid-cols-2 gap-3 mb-8">
         <StatCard label="Calls today" value={stats.callsToday} hint={isNew ? "—" : `${Math.round(stats.conversionRate * 100)}% booked`} icon={<Phone className="h-4 w-4" />} accent />
         <StatCard label="Bookings" value={stats.bookingsToday} hint={isNew ? "—" : `${fmtMoney(stats.revenueBookedToday)} booked`} icon={<CalendarDays className="h-4 w-4" />} />
-        <StatCard label="New leads" value={newLeads} hint={isNew ? "—" : "In your pipeline"} icon={<Users className="h-4 w-4" />} />
         <StatCard label="SMS sent" value={stats.smsSent} hint={isNew ? "—" : "Confirmations & replies"} icon={<Sparkles className="h-4 w-4" />} />
       </div>
 
