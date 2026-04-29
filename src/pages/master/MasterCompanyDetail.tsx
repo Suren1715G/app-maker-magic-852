@@ -18,6 +18,7 @@ import { calls, bookings, sms } from "@/data/mock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { CompanyBookingIntegration } from "@/components/master/CompanyBookingIntegration";
 type Detail = {
   id: string;
   name: string;
@@ -361,6 +362,8 @@ const MasterCompanyDetail = () => {
                 })}
               </ul>
             </section>
+
+            <CompanyBookingIntegration companyId={data.id} />
           </div>
 
           {/* Right: activity preview */}
