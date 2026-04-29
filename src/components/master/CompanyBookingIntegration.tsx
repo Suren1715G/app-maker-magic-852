@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, CalendarDays, Link2, Trash2 } from "lucide-react";
+import { Loader2, CalendarDays, Link2, Trash2, FlaskConical, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 type CompanyBooking = {
@@ -28,6 +28,8 @@ export function CompanyBookingIntegration({ companyId }: { companyId: string }) 
   const [row, setRow] = useState<CompanyBooking | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [calOpen, setCalOpen] = useState(false);
   const [calToken, setCalToken] = useState("");
@@ -167,6 +169,40 @@ export function CompanyBookingIntegration({ companyId }: { companyId: string }) 
     }
   };
 
+  const testBooking = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Not signed in");
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-test-booking`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ company_id: companyId, action: "get_provider" }),
+      });
+      const result = await res.json();
+      const inner = result?.data ?? {};
+      if (!res.ok) throw new Error(inner?.error ?? `HTTP ${res.status}`);
+      const ok = Boolean(inner?.configured);
+      setTestResult({
+        ok,
+        text: ok
+          ? `Provider "${inner.provider}" is connected and reachable.`
+          : `Provider "${inner.provider}" is selected but NOT configured. Connect it above.`,
+      });
+    } catch (e: any) {
+      setTestResult({ ok: false, text: e.message ?? "Test failed" });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const provider = row?.booking_provider ?? "google";
   const isConnected =
     (provider === "google" && !!row?.shared_calendar_id) ||
@@ -175,9 +211,21 @@ export function CompanyBookingIntegration({ companyId }: { companyId: string }) 
 
   return (
     <section className="glass rounded-2xl p-5">
-      <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
-        <CalendarDays className="h-3.5 w-3.5" /> Booking integration
-      </h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <CalendarDays className="h-3.5 w-3.5" /> Booking integration
+        </h2>
+        {!loading && (
+          <span
+            className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
+              isConnected ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
+            }`}
+          >
+            {isConnected ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+            {isConnected ? "Ready" : "Not set up"}
+          </span>
+        )}
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-4">
@@ -242,6 +290,27 @@ export function CompanyBookingIntegration({ companyId }: { companyId: string }) 
             >
               <Link2 className="h-3.5 w-3.5 mr-1.5" /> Connect Squarespace (Acuity)
             </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={testBooking}
+              disabled={testing || busy}
+              className="justify-start"
+            >
+              {testing ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <FlaskConical className="h-3.5 w-3.5 mr-1.5" />}
+              Test booking integration
+            </Button>
+            {testResult && (
+              <div
+                className={`text-xs rounded-md p-2 ${
+                  testResult.ok
+                    ? "bg-success/10 text-success"
+                    : "bg-destructive/10 text-destructive"
+                }`}
+              >
+                {testResult.text}
+              </div>
+            )}
           </div>
         </>
       )}

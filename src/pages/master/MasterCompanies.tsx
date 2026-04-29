@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { MasterShell } from "@/components/master/MasterShell";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, Loader2, Search } from "lucide-react";
+import { Building2, Loader2, Search, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 type CompanyRow = {
   id: string;
@@ -17,6 +19,7 @@ const MasterCompanies = () => {
   const [rows, setRows] = useState<CompanyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const [resyncing, setResyncing] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -33,10 +36,47 @@ const MasterCompanies = () => {
     r.name.toLowerCase().includes(q.toLowerCase()),
   );
 
+  const resyncAll = async () => {
+    if (!confirm("Re-sync the AI agent for ALL companies? This pushes the latest tools and prompt to every ElevenLabs agent.")) return;
+    setResyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Not signed in");
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-resync-agent`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ all: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed");
+      if (data.failed > 0) {
+        toast.warning(`${data.success}/${data.total} re-synced. ${data.failed} failed.`);
+      } else {
+        toast.success(`Re-synced ${data.success} agent${data.success === 1 ? "" : "s"}.`);
+      }
+    } catch (e: any) {
+      toast.error(e.message ?? "Re-sync failed");
+    } finally {
+      setResyncing(false);
+    }
+  };
+
   return (
     <MasterShell
       title="Companies"
       subtitle={`${rows.length} signed up`}
+      right={
+        <Button size="sm" variant="outline" onClick={resyncAll} disabled={resyncing}>
+          {resyncing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+          Re-sync all agents
+        </Button>
+      }
     >
       <div className="relative mb-5 max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
