@@ -128,13 +128,22 @@ export type Database = {
       }
       companies: {
         Row: {
+          acuity_api_key: string | null
+          acuity_appointment_type_id: string | null
+          acuity_scheduling_url: string | null
+          acuity_user_id: string | null
           ai_first_message: string | null
           ai_system_prompt: string | null
           ai_voice_id: string | null
+          booking_provider: string
           business_hours_always_on: boolean
           business_hours_close: string
           business_hours_open: string
           business_hours_timezone: string
+          calendly_access_token: string | null
+          calendly_event_type_uri: string | null
+          calendly_scheduling_url: string | null
+          calendly_user_uri: string | null
           created_at: string
           google_business_account_id: string | null
           google_business_location_id: string | null
@@ -148,13 +157,22 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          acuity_api_key?: string | null
+          acuity_appointment_type_id?: string | null
+          acuity_scheduling_url?: string | null
+          acuity_user_id?: string | null
           ai_first_message?: string | null
           ai_system_prompt?: string | null
           ai_voice_id?: string | null
+          booking_provider?: string
           business_hours_always_on?: boolean
           business_hours_close?: string
           business_hours_open?: string
           business_hours_timezone?: string
+          calendly_access_token?: string | null
+          calendly_event_type_uri?: string | null
+          calendly_scheduling_url?: string | null
+          calendly_user_uri?: string | null
           created_at?: string
           google_business_account_id?: string | null
           google_business_location_id?: string | null
@@ -168,13 +186,22 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          acuity_api_key?: string | null
+          acuity_appointment_type_id?: string | null
+          acuity_scheduling_url?: string | null
+          acuity_user_id?: string | null
           ai_first_message?: string | null
           ai_system_prompt?: string | null
           ai_voice_id?: string | null
+          booking_provider?: string
           business_hours_always_on?: boolean
           business_hours_close?: string
           business_hours_open?: string
           business_hours_timezone?: string
+          calendly_access_token?: string | null
+          calendly_event_type_uri?: string | null
+          calendly_scheduling_url?: string | null
+          calendly_user_uri?: string | null
           created_at?: string
           google_business_account_id?: string | null
           google_business_location_id?: string | null
@@ -471,6 +498,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pending_admin_google_oauth: {
+        Row: {
+          admin_user_id: string
+          company_id: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          state: string
+        }
+        Insert: {
+          admin_user_id: string
+          company_id: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          state: string
+        }
+        Update: {
+          admin_user_id?: string
+          company_id?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          state?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -840,6 +897,43 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_clear_company_booking: {
+        Args: { _company_id: string }
+        Returns: undefined
+      }
+      admin_save_company_google_tokens: {
+        Args: {
+          _access_token: string
+          _calendar_id: string
+          _calendar_summary: string
+          _company_id: string
+          _expires_at: string
+          _google_email: string
+          _refresh_token: string
+          _scope: string
+        }
+        Returns: undefined
+      }
+      admin_set_company_acuity: {
+        Args: {
+          _api_key: string
+          _appointment_type_id: string
+          _company_id: string
+          _scheduling_url: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
+      admin_set_company_calendly: {
+        Args: {
+          _access_token: string
+          _company_id: string
+          _event_type_uri: string
+          _scheduling_url: string
+          _user_uri: string
+        }
+        Returns: undefined
+      }
       claim_access_code: { Args: { _code: string }; Returns: string }
       generate_referral_code: { Args: never; Returns: string }
       get_company_calendar_connection: {
