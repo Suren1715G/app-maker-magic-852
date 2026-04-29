@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.assistant-action]
 verify_jwt = false
+
+[functions.admin-google-oauth-start]
+verify_jwt = false
+
+[functions.admin-google-oauth-callback]
+verify_jwt = false
