@@ -9,7 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ReferralCubes } from "@/components/app/ReferralCubes";
 import { supabase } from "@/integrations/supabase/client";
 
-const BASE_PRICE = 250;
+const BASE_PRICE = 269;
+const REFERRAL_SITE_URL = "https://sgsaireception.com";
 const TIERS = [
   { count: 1, off: 50, label: "$50 OFF" },
   { count: 2, off: 100, label: "$100 OFF" },
@@ -129,9 +130,9 @@ const Referrals = () => {
   }, [user?.id]);
 
   const link = refCode
-    ? `${window.location.origin}/auth?mode=signup&ref=${refCode}`
-    : `${window.location.origin}/auth?mode=signup`;
-  const message = `Hey, I use this AI receptionist that answers all my calls and books appointments automatically. Costs $250/month and pays for itself easily. Check it out: ${link}`;
+    ? `${REFERRAL_SITE_URL}/?ref=${refCode}`
+    : REFERRAL_SITE_URL;
+  const message = `Hey, I use this AI receptionist that answers all my calls and books appointments automatically. Costs $${BASE_PRICE}/month and pays for itself easily. Check it out: ${link}`;
 
   const [copied, setCopied] = useState<"link" | "msg" | null>(null);
   const copyTo = async (text: string, kind: "link" | "msg", label: string) => {
