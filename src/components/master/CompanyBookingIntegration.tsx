@@ -14,11 +14,9 @@ import { Loader2, CalendarDays, Link2, Trash2, FlaskConical, CheckCircle2, XCirc
 import { toast } from "sonner";
 
 type CompanyBooking = {
-  booking_provider: "google" | "calendly" | "acuity";
+  booking_provider: "google" | "acuity";
   shared_calendar_id: string | null;
   shared_calendar_summary: string | null;
-  calendly_event_type_uri: string | null;
-  calendly_scheduling_url: string | null;
   acuity_user_id: string | null;
   acuity_appointment_type_id: string | null;
   acuity_scheduling_url: string | null;
@@ -31,10 +29,6 @@ export function CompanyBookingIntegration({ companyId }: { companyId: string }) 
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const [calOpen, setCalOpen] = useState(false);
-  const [calToken, setCalToken] = useState("");
-  const [calEventUri, setCalEventUri] = useState("");
-
   const [acuOpen, setAcuOpen] = useState(false);
   const [acuUser, setAcuUser] = useState("");
   const [acuKey, setAcuKey] = useState("");
@@ -45,7 +39,7 @@ export function CompanyBookingIntegration({ companyId }: { companyId: string }) 
     const { data } = await supabase
       .from("companies")
       .select(
-        "booking_provider, shared_calendar_id, shared_calendar_summary, calendly_event_type_uri, calendly_scheduling_url, acuity_user_id, acuity_appointment_type_id, acuity_scheduling_url",
+        "booking_provider, shared_calendar_id, shared_calendar_summary, acuity_user_id, acuity_appointment_type_id, acuity_scheduling_url",
       )
       .eq("id", companyId)
       .maybeSingle();
@@ -103,30 +97,6 @@ export function CompanyBookingIntegration({ companyId }: { companyId: string }) 
     const json = await res.json();
     if (!res.ok) throw new Error(json.error ?? "Failed");
     return json;
-  };
-
-  const saveCalendly = async () => {
-    if (!calToken.trim() || !calEventUri.trim()) {
-      toast.error("Token and event type URI are required");
-      return;
-    }
-    setBusy(true);
-    try {
-      await callAdminBooking({
-        provider: "calendly",
-        calendly_access_token: calToken.trim(),
-        calendly_event_type_uri: calEventUri.trim(),
-      });
-      toast.success("Calendly connected");
-      setCalOpen(false);
-      setCalToken("");
-      setCalEventUri("");
-      await load();
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed");
-    } finally {
-      setBusy(false);
-    }
   };
 
   const saveAcuity = async () => {
@@ -206,7 +176,6 @@ export function CompanyBookingIntegration({ companyId }: { companyId: string }) 
   const provider = row?.booking_provider ?? "google";
   const isConnected =
     (provider === "google" && !!row?.shared_calendar_id) ||
-    (provider === "calendly" && !!row?.calendly_event_type_uri) ||
     (provider === "acuity" && !!row?.acuity_user_id);
 
   return (
@@ -243,7 +212,6 @@ export function CompanyBookingIntegration({ companyId }: { companyId: string }) 
               </div>
               <div className="mt-2 text-xs text-muted-foreground break-all">
                 {provider === "google" && (row.shared_calendar_summary ?? row.shared_calendar_id)}
-                {provider === "calendly" && (row.calendly_scheduling_url ?? row.calendly_event_type_uri)}
                 {provider === "acuity" && (row.acuity_scheduling_url ?? `User ${row.acuity_user_id}`)}
               </div>
               <Button
@@ -271,15 +239,6 @@ export function CompanyBookingIntegration({ companyId }: { companyId: string }) 
               className="justify-start"
             >
               <Link2 className="h-3.5 w-3.5 mr-1.5" /> Connect Google Calendar
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setCalOpen(true)}
-              disabled={busy}
-              className="justify-start"
-            >
-              <Link2 className="h-3.5 w-3.5 mr-1.5" /> Connect Calendly
             </Button>
             <Button
               size="sm"
@@ -314,54 +273,6 @@ export function CompanyBookingIntegration({ companyId }: { companyId: string }) 
           </div>
         </>
       )}
-
-      {/* Calendly dialog */}
-      <Dialog open={calOpen} onOpenChange={setCalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Connect Calendly</DialogTitle>
-            <DialogDescription>
-              Get the client's Personal Access Token from{" "}
-              <a
-                href="https://calendly.com/integrations/api_webhooks"
-                target="_blank"
-                rel="noreferrer"
-                className="underline"
-              >
-                Calendly → Integrations → API
-              </a>
-              , and the Event Type URI from the event's "Share" → "Add to Website" embed (looks like
-              {" "}<code>https://api.calendly.com/event_types/...</code>).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-muted-foreground">Personal Access Token</label>
-              <Input
-                value={calToken}
-                onChange={(e) => setCalToken(e.target.value)}
-                placeholder="eyJ..."
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Event Type URI</label>
-              <Input
-                value={calEventUri}
-                onChange={(e) => setCalEventUri(e.target.value)}
-                placeholder="https://api.calendly.com/event_types/..."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setCalOpen(false)} disabled={busy}>
-              Cancel
-            </Button>
-            <Button onClick={saveCalendly} disabled={busy}>
-              {busy && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />} Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Acuity dialog */}
       <Dialog open={acuOpen} onOpenChange={setAcuOpen}>
