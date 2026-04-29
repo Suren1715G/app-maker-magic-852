@@ -1,7 +1,6 @@
-// Admin-only endpoint to configure Calendly or Acuity for a company,
+// Admin-only endpoint to configure Acuity for a company,
 // or clear an existing booking integration.
 //
-// POST { provider: "calendly", company_id, calendly_access_token, calendly_event_type_uri }
 // POST { provider: "acuity",   company_id, acuity_user_id, acuity_api_key, appointment_type_id }
 // POST { action: "clear", company_id }
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -45,31 +44,6 @@ Deno.serve(async (req) => {
       const { error } = await userClient.rpc("admin_clear_company_booking", { _company_id: companyId });
       if (error) return json({ error: error.message }, 500);
       return json({ ok: true });
-    }
-
-    if (body.provider === "calendly") {
-      const token = body.calendly_access_token as string | undefined;
-      const eventTypeUri = body.calendly_event_type_uri as string | undefined;
-      if (!token || !eventTypeUri) return json({ error: "Missing Calendly fields" }, 400);
-
-      // Validate token by fetching the user
-      const meRes = await fetch("https://api.calendly.com/users/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const me = await meRes.json();
-      if (!meRes.ok) return json({ error: `Calendly token invalid: ${JSON.stringify(me)}` }, 400);
-      const userUri = me.resource?.uri ?? null;
-      const schedulingUrl = me.resource?.scheduling_url ?? null;
-
-      const { error } = await userClient.rpc("admin_set_company_calendly", {
-        _company_id: companyId,
-        _access_token: token,
-        _user_uri: userUri,
-        _event_type_uri: eventTypeUri,
-        _scheduling_url: schedulingUrl,
-      });
-      if (error) return json({ error: error.message }, 500);
-      return json({ ok: true, user_uri: userUri, scheduling_url: schedulingUrl });
     }
 
     if (body.provider === "acuity") {
