@@ -64,7 +64,7 @@ const PLANS: Plan[] = [
   },
 ];
 
-const MANAGE_BILLING_URL = "https://sgsaireception.com/billing";
+const MANAGE_BILLING_URL = "https://sgsaireception.com";
 
 const Billing = () => {
   const isNew = useIsNewCustomer();
