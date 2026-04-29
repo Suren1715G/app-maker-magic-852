@@ -139,6 +139,67 @@ function buildActionTool(supabaseUrl: string, secret: string, companyId: string)
   };
 }
 
+function buildBookingTool(supabaseUrl: string, secret: string, companyId: string) {
+  return {
+    type: "webhook",
+    name: "manage_booking",
+    description:
+      "Check availability or book an appointment for THIS company. The company may use Google Calendar, Calendly, or Acuity Scheduling — this tool routes automatically. Always start with action='get_provider' if unsure whether booking is configured. For book_appointment, ALWAYS call with confirmed=false first to preview, repeat to the user, get verbal yes, then call again with confirmed=true. For Calendly, booking returns a scheduling_url that you must SMS to the customer (use perform_action send_sms) — Calendly requires the customer to finalize.",
+    api_schema: {
+      url: `${supabaseUrl}/functions/v1/assistant-booking`,
+      method: "POST",
+      request_headers: {
+        "x-assistant-secret": secret,
+        "Content-Type": "application/json",
+      },
+      request_body_schema: {
+        type: "object",
+        required: ["action"],
+        properties: {
+          action: {
+            type: "string",
+            enum: ["get_provider", "check_availability", "book_appointment"],
+            description:
+              "get_provider returns which booking system this company uses + whether it's configured. check_availability returns busy times (Google) or available slots (Calendly/Acuity) for a window. book_appointment creates the booking.",
+          },
+          start_time: {
+            type: "string",
+            description: "ISO 8601 datetime, e.g. 2026-05-02T14:00:00-04:00. Required for check_availability and book_appointment.",
+          },
+          end_time: {
+            type: "string",
+            description: "ISO 8601 datetime — end of the window for check_availability. Optional; defaults to start_time + 1 hour.",
+          },
+          duration_minutes: {
+            type: "number",
+            description: "Length of the appointment in minutes. Default 60. (Used by book_appointment.)",
+          },
+          summary: {
+            type: "string",
+            description: "Short title for the appointment (Google only). E.g. 'Consultation — Jane Doe'.",
+          },
+          description: {
+            type: "string",
+            description: "Optional notes for the appointment.",
+          },
+          customer_name: { type: "string", description: "Customer full name." },
+          customer_email: { type: "string", description: "Customer email. REQUIRED for Acuity bookings." },
+          customer_phone: { type: "string", description: "Customer phone, any format." },
+          confirmed: {
+            type: "boolean",
+            description:
+              "MUST be false on the first call to book_appointment (returns a preview). After verbal confirmation, call AGAIN with confirmed=true.",
+          },
+          company_id: {
+            type: "string",
+            constant_value: companyId,
+          },
+        },
+      },
+    },
+  };
+}
+
 function buildClientTools() {
   return [
     {
@@ -169,7 +230,7 @@ function injectCompanyContext(
   companyName: string,
   companyId: string,
 ) {
-  const block = `\n\n---\nYou are the AI receptionist and assistant for "${companyName}".\n\n## Core rule\nNEVER say "I can't help with that" or "I don't have access" without first calling lookup_business_data. If you are unsure whether a topic is queryable, call lookup_business_data with action="data_index" — it returns the full list of what IS connected and what is NOT yet connected.\n\n## Live data you CAN query (via lookup_business_data)\n- Calls: counts, recent calls, search by name or phone (call_stats, recent_calls, search_calls)\n- SMS / text messages: counts, recent texts, search by message body (message_stats, recent_messages, search_messages)\n- Leads & bookings: derived from tagged calls (leads_summary)\n- Business info: company name, phone numbers (business_info)\n\n## NOT yet connected to live data\nThese pages exist in the app but currently show demo / placeholder content — there is no real database behind them yet:\n- Reviews\n- Calendar / appointments\n- Notifications feed\n- Notes list (you CAN create notes via perform_action, but cannot list them)\n\nIf the user asks about messages or texts, use message_stats/recent_messages/search_messages. If there are zero results, say there are no tracked messages for that period yet — do not say you cannot see messages.\n\n## Actions\n- Use perform_action for server-only work (tag a call, send SMS, create a note/reminder). Always confirm-first: confirmed=false to preview, repeat to user, get verbal yes, then confirmed=true.\n- Use navigate_to to take the user to a page when they want to change a setting, request a new location/phone number, or fill a form. You do NOT click buttons, toggle switches, or type in forms — describe verbally where the control is and let the user act.\n- NEVER claim you clicked, submitted, toggled, sent, or completed something unless a tool literally returned success.\n\nAlways pass company_id="${companyId}" exactly as-is to server tools.\n---\n`;
+  const block = `\n\n---\nYou are the AI receptionist and assistant for "${companyName}".\n\n## Core rule\nNEVER say "I can't help with that" or "I don't have access" without first calling lookup_business_data. If you are unsure whether a topic is queryable, call lookup_business_data with action="data_index" — it returns the full list of what IS connected and what is NOT yet connected.\n\n## Live data you CAN query (via lookup_business_data)\n- Calls: counts, recent calls, search by name or phone\n- SMS / text messages: counts, recent texts, search by body\n- Leads & bookings: derived from tagged calls\n- Business info: company name, phone numbers\n\n## Booking & appointments (via manage_booking)\nThis company uses one of: Google Calendar, Calendly, or Acuity Scheduling. You don't need to know which — call manage_booking with action="get_provider" once at the start of any booking conversation to find out, then proceed.\n- check_availability returns busy windows (Google) or open slots (Calendly/Acuity).\n- book_appointment must always be called with confirmed=false first; repeat the time + customer details back to the caller, get an explicit verbal yes, then call again with confirmed=true.\n- For Calendly: book_appointment returns a scheduling_url. You MUST then SMS that link to the caller using perform_action send_sms — Calendly requires the customer to finalize the booking themselves.\n- For Acuity: customer_email is required.\n- For Google: the appointment is created directly on the company's shared calendar.\nIf get_provider returns configured=false, tell the caller booking isn't set up yet and offer to take a message via create_note instead.\n\n## NOT yet connected to live data\n- Reviews, Notifications feed, Notes list (you CAN create notes, just not list them).\n\n## Actions\n- Use perform_action for server-only work (tag a call, send SMS, create a note/reminder). Always confirm-first.\n- Use navigate_to to take the user to a page when they want to fill a form. You do NOT click or type for them.\n- NEVER claim you booked, sent, or completed something unless a tool literally returned success.\n\nAlways pass company_id="${companyId}" exactly as-is to server tools.\n---\n`;
   return (baseSystemPrompt ?? "") + block;
 }
 
@@ -214,6 +275,7 @@ Deno.serve(async (req) => {
 
     const lookupTool = buildAssistantTool(SUPABASE_URL, ASSISTANT_TOOL_SECRET, company_id);
     const actionTool = buildActionTool(SUPABASE_URL, ASSISTANT_TOOL_SECRET, company_id);
+    const bookingTool = buildBookingTool(SUPABASE_URL, ASSISTANT_TOOL_SECRET, company_id);
     const clientTools = buildClientTools();
 
     if (existing?.agent_id) {
@@ -235,6 +297,7 @@ Deno.serve(async (req) => {
         (t: any) =>
           t?.name !== "lookup_business_data" &&
           t?.name !== "perform_action" &&
+          t?.name !== "manage_booking" &&
           !clientTools.some((clientTool) => clientTool.name === t?.name),
       );
       const promptText: string = curPrompt?.prompt ?? "";
@@ -258,7 +321,7 @@ Deno.serve(async (req) => {
               agent: {
                 prompt: {
                   prompt: newPromptText,
-                  tools: [...filteredTools, lookupTool, actionTool, ...clientTools],
+                  tools: [...filteredTools, lookupTool, actionTool, bookingTool, ...clientTools],
                 },
               },
             },
@@ -294,6 +357,7 @@ Deno.serve(async (req) => {
               ...(Array.isArray(basePrompt?.tools) ? basePrompt.tools : []),
               lookupTool,
               actionTool,
+              bookingTool,
               ...clientTools,
             ],
           },
