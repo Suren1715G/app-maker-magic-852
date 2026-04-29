@@ -4,7 +4,7 @@ import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { bookings as mockBookings, type Booking } from "@/data/mock";
 import { fmtTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ChevronLeft, ChevronRight, Clock, MoreVertical, CalendarX, UserX, CalendarClock, Link2, Loader2, LogOut, Users } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock, MoreVertical, CalendarX, UserX, CalendarClock, Link2, Loader2, LogOut, Users, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,6 +86,100 @@ const Calendar = () => {
   const [myCalendars, setMyCalendars] = useState<Array<{ id: string; summary: string; primary: boolean }>>([]);
   const [pickerLoading, setPickerLoading] = useState(false);
 
+  // Booking provider (single source of truth from companies row)
+  type BookingRow = {
+    booking_provider: "google" | "acuity";
+    acuity_user_id: string | null;
+    acuity_scheduling_url: string | null;
+  };
+  const [booking, setBooking] = useState<BookingRow | null>(null);
+  const [acuOpen, setAcuOpen] = useState(false);
+  const [acuUser, setAcuUser] = useState("");
+  const [acuKey, setAcuKey] = useState("");
+  const [acuType, setAcuType] = useState("");
+  const [acuBusy, setAcuBusy] = useState(false);
+
+  const refreshBooking = async () => {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("company_id")
+      .maybeSingle();
+    if (!prof?.company_id) return;
+    const { data } = await supabase
+      .from("companies")
+      .select("booking_provider, acuity_user_id, acuity_scheduling_url")
+      .eq("id", prof.company_id)
+      .maybeSingle();
+    setBooking((data as BookingRow) ?? null);
+  };
+
+  const acuityActive = booking?.booking_provider === "acuity" && !!booking?.acuity_user_id;
+
+  const loadAcuityAppointments = async () => {
+    setGcalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("company-booking", {
+        body: { action: "list_acuity_appointments" },
+      });
+      if (error) throw new Error(error.message);
+      const mapped: Booking[] = (data?.items ?? []).map((a: any) => ({
+        id: a.id,
+        customer: a.customer,
+        service: a.service,
+        startsAt: a.startsAt,
+        durationMin: a.durationMin,
+        smsConfirmed: true,
+        status: a.status,
+      }));
+      setItems(mapped);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load Acuity appointments");
+    } finally {
+      setGcalLoading(false);
+    }
+  };
+
+  const connectAcuity = async () => {
+    if (!acuUser.trim() || !acuKey.trim()) {
+      toast.error("User ID and API Key required");
+      return;
+    }
+    setAcuBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("company-booking", {
+        body: {
+          action: "connect_acuity",
+          acuity_user_id: acuUser.trim(),
+          acuity_api_key: acuKey.trim(),
+          acuity_appointment_type_id: acuType.trim() || null,
+        },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message || "Failed");
+      toast.success("Squarespace (Acuity) connected. Google was disconnected.");
+      setAcuOpen(false);
+      setAcuUser(""); setAcuKey(""); setAcuType("");
+      await Promise.all([refreshBooking(), refreshStatus()]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to connect");
+    } finally {
+      setAcuBusy(false);
+    }
+  };
+
+  const disconnectAcuity = async () => {
+    if (!confirm("Disconnect Squarespace (Acuity)?")) return;
+    const { error } = await supabase.functions.invoke("company-booking", {
+      body: { action: "clear" },
+    });
+    if (error) {
+      toast.error("Failed to disconnect");
+      return;
+    }
+    toast.success("Disconnected");
+    await Promise.all([refreshBooking(), refreshStatus()]);
+    setItems(isNew ? [] : mockBookings);
+  };
+
   const refreshStatus = async () => {
     const { data, error } = await supabase.functions.invoke("google-calendar", {
       body: { action: "status" },
@@ -133,19 +228,24 @@ const Calendar = () => {
 
   useEffect(() => {
     refreshStatus();
+    refreshBooking();
   }, []);
 
   useEffect(() => {
-    // Show events whenever either: this user is connected, OR the company has
+    if (acuityActive) {
+      loadAcuityAppointments();
+      return;
+    }
+    // Show Google events whenever either: this user is connected, OR the company has
     // a shared calendar set (the backend will use the owner's tokens).
     const canLoad = gcalStatus?.connected || gcalStatus?.company?.shared_configured;
     if (canLoad) loadEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gcalStatus?.connected, gcalStatus?.company?.shared_configured]);
+  }, [gcalStatus?.connected, gcalStatus?.company?.shared_configured, acuityActive]);
 
   // Re-check status when window regains focus (after OAuth redirect tab closes)
   useEffect(() => {
-    const onFocus = () => refreshStatus();
+    const onFocus = () => { refreshStatus(); refreshBooking(); };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, []);
