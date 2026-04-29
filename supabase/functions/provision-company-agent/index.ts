@@ -229,8 +229,13 @@ function injectCompanyContext(
   baseSystemPrompt: string | undefined,
   companyName: string,
   companyId: string,
+  customOverride?: string | null,
 ) {
-  const block = `\n\n---\nYou are the AI receptionist and assistant for "${companyName}".\n\n## Core rule\nNEVER say "I can't help with that" or "I don't have access" without first calling lookup_business_data. If you are unsure whether a topic is queryable, call lookup_business_data with action="data_index" — it returns the full list of what IS connected and what is NOT yet connected.\n\n## Live data you CAN query (via lookup_business_data)\n- Calls: counts, recent calls, search by name or phone\n- SMS / text messages: counts, recent texts, search by body\n- Leads & bookings: derived from tagged calls\n- Business info: company name, phone numbers\n\n## Booking & appointments (via manage_booking)\nThis company uses one of: Google Calendar, Calendly, or Acuity Scheduling. You don't need to know which — call manage_booking with action="get_provider" once at the start of any booking conversation to find out, then proceed.\n- check_availability returns busy windows (Google) or open slots (Calendly/Acuity).\n- book_appointment must always be called with confirmed=false first; repeat the time + customer details back to the caller, get an explicit verbal yes, then call again with confirmed=true.\n- For Calendly: book_appointment returns a scheduling_url. You MUST then SMS that link to the caller using perform_action send_sms — Calendly requires the customer to finalize the booking themselves.\n- For Acuity: customer_email is required.\n- For Google: the appointment is created directly on the company's shared calendar.\nIf get_provider returns configured=false, tell the caller booking isn't set up yet and offer to take a message via create_note instead.\n\n## NOT yet connected to live data\n- Reviews, Notifications feed, Notes list (you CAN create notes, just not list them).\n\n## Actions\n- Use perform_action for server-only work (tag a call, send SMS, create a note/reminder). Always confirm-first.\n- Use navigate_to to take the user to a page when they want to fill a form. You do NOT click or type for them.\n- NEVER claim you booked, sent, or completed something unless a tool literally returned success.\n\nAlways pass company_id="${companyId}" exactly as-is to server tools.\n---\n`;
+  const overrideBlock =
+    customOverride && customOverride.trim().length > 0
+      ? `\n\n## Company-specific instructions\n${customOverride.trim()}\n`
+      : "";
+  const block = `\n\n---\nYou are the AI receptionist and assistant for "${companyName}".\n${overrideBlock}\n## Core rule\nNEVER say "I can't help with that" or "I don't have access" without first calling lookup_business_data. If you are unsure whether a topic is queryable, call lookup_business_data with action="data_index" — it returns the full list of what IS connected and what is NOT yet connected.\n\n## Live data you CAN query (via lookup_business_data)\n- Calls: counts, recent calls, search by name or phone\n- SMS / text messages: counts, recent texts, search by body\n- Leads & bookings: derived from tagged calls\n- Business info: company name, phone numbers\n\n## Booking & appointments (via manage_booking)\nThis company uses one of: Google Calendar, Calendly, or Acuity Scheduling. You don't need to know which — call manage_booking with action="get_provider" once at the start of any booking conversation to find out, then proceed.\n- check_availability returns busy windows (Google) or open slots (Calendly/Acuity).\n- book_appointment must always be called with confirmed=false first; repeat the time + customer details back to the caller, get an explicit verbal yes, then call again with confirmed=true.\n- For Calendly: book_appointment returns a scheduling_url. You MUST then SMS that link to the caller using perform_action send_sms — Calendly requires the customer to finalize the booking themselves.\n- For Acuity: customer_email is required.\n- For Google: the appointment is created directly on the company's shared calendar.\nIf get_provider returns configured=false, tell the caller booking isn't set up yet and offer to take a message via create_note instead.\n\n## NOT yet connected to live data\n- Reviews, Notifications feed, Notes list (you CAN create notes, just not list them).\n\n## Actions\n- Use perform_action for server-only work (tag a call, send SMS, create a note/reminder). Always confirm-first.\n- Use navigate_to to take the user to a page when they want to fill a form. You do NOT click or type for them.\n- NEVER claim you booked, sent, or completed something unless a tool literally returned success.\n\nAlways pass company_id="${companyId}" exactly as-is to server tools.\n---\n`;
   return (baseSystemPrompt ?? "") + block;
 }
 
@@ -261,7 +266,7 @@ Deno.serve(async (req) => {
     // Get company name
     const { data: company } = await admin
       .from("companies")
-      .select("name, ai_voice_id")
+      .select("name, ai_voice_id, ai_first_message, ai_system_prompt")
       .eq("id", company_id)
       .maybeSingle();
     if (!company) return json({ error: "Company not found" }, 404);
@@ -306,7 +311,26 @@ Deno.serve(async (req) => {
         /\n\n---\nYou are the AI receptionist[\s\S]*?---\n/,
         "",
       );
-      const newPromptText = injectCompanyContext(stripped, company.name, company_id);
+      const newPromptText = injectCompanyContext(
+        stripped,
+        company.name,
+        company_id,
+        company.ai_system_prompt,
+      );
+
+      const agentPatch: Record<string, unknown> = {
+        prompt: {
+          prompt: newPromptText,
+          tools: [...filteredTools, lookupTool, actionTool, bookingTool, ...clientTools],
+        },
+      };
+      if (company.ai_first_message && company.ai_first_message.trim().length > 0) {
+        agentPatch.first_message = company.ai_first_message.trim();
+      }
+      const convPatch: Record<string, unknown> = { agent: agentPatch };
+      if (company.ai_voice_id) {
+        convPatch.tts = { voice_id: company.ai_voice_id };
+      }
 
       const patchResp = await fetch(
         `https://api.elevenlabs.io/v1/convai/agents/${existing.agent_id}`,
@@ -317,14 +341,7 @@ Deno.serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            conversation_config: {
-              agent: {
-                prompt: {
-                  prompt: newPromptText,
-                  tools: [...filteredTools, lookupTool, actionTool, bookingTool, ...clientTools],
-                },
-              },
-            },
+            conversation_config: convPatch,
           }),
         },
       );
@@ -350,9 +367,15 @@ Deno.serve(async (req) => {
         ...templateConvConfig,
         agent: {
           ...baseAgent,
+          ...(company.ai_first_message ? { first_message: company.ai_first_message.trim() } : {}),
           prompt: {
             ...basePrompt,
-            prompt: injectCompanyContext(basePrompt?.prompt, company.name, company_id),
+            prompt: injectCompanyContext(
+              basePrompt?.prompt,
+              company.name,
+              company_id,
+              company.ai_system_prompt,
+            ),
             tools: [
               ...(Array.isArray(basePrompt?.tools) ? basePrompt.tools : []),
               lookupTool,
