@@ -64,7 +64,7 @@ const PLANS: Plan[] = [
   },
 ];
 
-const MANAGE_BILLING_URL = "https://app-maker-magic-852.lovable.app/billing"; // TODO: replace with your real billing portal URL
+const MANAGE_BILLING_URL = "https://sgsaireception.com/billing";
 
 const Billing = () => {
   const isNew = useIsNewCustomer();
