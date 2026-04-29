@@ -536,6 +536,40 @@ const Calendar = () => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={acuOpen} onOpenChange={setAcuOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Connect Squarespace Scheduling (Acuity)</DialogTitle>
+            <DialogDescription>
+              In your Acuity / Squarespace Scheduling account: Integrations → API → copy the
+              User ID and API Key. Connecting Acuity will disconnect Google Calendar — only
+              one provider can be active at a time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground">User ID</label>
+              <Input value={acuUser} onChange={(e) => setAcuUser(e.target.value)} placeholder="123456" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">API Key</label>
+              <Input value={acuKey} onChange={(e) => setAcuKey(e.target.value)} placeholder="abcd1234..." />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Appointment Type ID (optional)</label>
+              <Input value={acuType} onChange={(e) => setAcuType(e.target.value)} placeholder="789012" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAcuOpen(false)} disabled={acuBusy}>Cancel</Button>
+            <Button onClick={connectAcuity} disabled={acuBusy}>
+              {acuBusy && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+              Connect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div data-tour="cal-scope" className="flex gap-2 mb-3">
         {(["all", "upcoming", "past"] as const).map((s) => (
           <button
