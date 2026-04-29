@@ -160,7 +160,12 @@ const Calendar = () => {
         return;
       }
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-oauth-start?return_to=${encodeURIComponent("/calendar")}`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to start OAuth");
       window.location.href = data.url;
