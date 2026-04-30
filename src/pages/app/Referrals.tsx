@@ -359,17 +359,16 @@ const Referrals = () => {
           <SectionLabel>YOUR DASHBOARD</SectionLabel>
           <SectionHeading plain="Track it" accent="live." />
           <div className="glass-strong rounded-3xl p-5 md:p-7">
-            <div className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground mb-2">
-              YOUR UNIQUE LINK
-            </div>
-            <div className="flex flex-col sm:flex-row items-stretch gap-2 mb-6">
-              <code className="flex-1 text-xs md:text-sm truncate px-4 py-3 rounded-2xl bg-background/50 border border-border/60 text-foreground/85 flex items-center">
-                {link}
-              </code>
-              <Button onClick={() => copyTo(link, "link", "Link")} className="sm:w-auto">
-                {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied === "link" ? "Copied" : "Copy"}
-              </Button>
+            <div className="rounded-2xl bg-background/50 border border-border/60 p-4 md:p-5 mb-6 text-center">
+              <div className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground mb-1">
+                REFERRALS HAPPEN ON
+              </div>
+              <div className="font-display text-xl md:text-2xl font-bold">
+                {REFERRAL_SITE_URL}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Tell other detailers to sign up there and mention your name.
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2 md:gap-3 mb-5">
