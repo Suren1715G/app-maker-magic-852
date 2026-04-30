@@ -456,26 +456,6 @@ const Referrals = () => {
           </div>
         </section>
 
-        {/* PRE-WRITTEN MESSAGE */}
-        <section className="relative mb-16">
-          <SectionLabel>PRE-WRITTEN MESSAGE</SectionLabel>
-          <h2 className="text-center font-display font-bold text-3xl md:text-5xl leading-[1.05] mb-10">
-            <span className="text-foreground">Copy.</span>{" "}
-            <span className="prism-text">Paste</span>
-            <span className="text-foreground">.</span>{" "}
-            <span className="prism-text">Done</span>
-            <span className="text-foreground">.</span>
-          </h2>
-          <div className="glass-strong rounded-3xl p-4 md:p-6">
-            <div className="rounded-2xl bg-background/60 border border-border/60 p-5 text-sm md:text-base text-foreground/85 leading-relaxed mb-4">
-              {message}
-            </div>
-            <Button className="w-full" size="lg" onClick={() => copyTo(message, "msg", "Message")}>
-              {copied === "msg" ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
-              {copied === "msg" ? "Copied" : "Copy message"}
-            </Button>
-          </div>
-        </section>
       </div>
     </AppShell>
   );
