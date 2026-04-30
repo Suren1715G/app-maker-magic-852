@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { Copy, Link2, Send, Sparkles, Share2, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { Send, Sparkles, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +8,7 @@ import { ReferralCubes } from "@/components/app/ReferralCubes";
 import { supabase } from "@/integrations/supabase/client";
 
 const BASE_PRICE = 269;
-const REFERRAL_SITE_URL = "https://sgsaireception.com";
+const REFERRAL_SITE_URL = "sgsaireception.com";
 const TIERS = [
   { count: 1, off: 50, label: "$50 OFF" },
   { count: 2, off: 100, label: "$100 OFF" },
