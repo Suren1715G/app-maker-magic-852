@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app/AppShell";
-import { Copy, Link2, Send, Sparkles, Share2, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { Send, Sparkles, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsNewCustomer } from "@/hooks/useIsNewCustomer";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +8,7 @@ import { ReferralCubes } from "@/components/app/ReferralCubes";
 import { supabase } from "@/integrations/supabase/client";
 
 const BASE_PRICE = 269;
-const REFERRAL_SITE_URL = "https://sgsaireception.com";
+const REFERRAL_SITE_URL = "sgsaireception.com";
 const TIERS = [
   { count: 1, off: 50, label: "$50 OFF" },
   { count: 2, off: 100, label: "$100 OFF" },
@@ -128,30 +126,6 @@ const Referrals = () => {
       cancelled = true;
     };
   }, [user?.id]);
-
-  const link = refCode
-    ? `${REFERRAL_SITE_URL}/?ref=${refCode}`
-    : REFERRAL_SITE_URL;
-  const message = `Hey, I use this AI receptionist that answers all my calls and books appointments automatically. Costs $${BASE_PRICE}/month and pays for itself easily. Check it out: ${link}`;
-
-  const [copied, setCopied] = useState<"link" | "msg" | null>(null);
-  const copyTo = async (text: string, kind: "link" | "msg", label: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(kind);
-      toast.success(`${label} copied`);
-      setTimeout(() => setCopied((c) => (c === kind ? null : c)), 1800);
-    } catch {
-      toast.error("Couldn't copy");
-    }
-  };
-
-  const share = async () => {
-    if (navigator.share) {
-      try { await navigator.share({ title: "Try SGS", url: link }); return; } catch {}
-    }
-    copyTo(link, "link", "Link");
-  };
 
   const [picked, setPicked] = useState(Math.max(1, earned));
   const { off: pickedOff, price: pickedPrice } = priceFor(picked);
@@ -357,8 +331,8 @@ const Referrals = () => {
           <SectionHeading plain="Three steps." accent="Zero effort." />
           <div className="grid md:grid-cols-3 gap-3 md:gap-4">
             {[
-              { icon: Link2, title: "Copy your link", body: "Every account gets a unique referral URL. One tap to copy from your dashboard." },
-              { icon: Send, title: "Send it to detailers", body: "Drop it in a DM, text, group chat, or email. Anyone running an auto detail shop." },
+              { icon: Globe, title: "Send detailers to our site", body: `Tell other shops to sign up at ${REFERRAL_SITE_URL} and mention your name.` },
+              { icon: Send, title: "They sign up", body: "When they become a paying customer, you get credit automatically." },
               { icon: Sparkles, title: "Discount applies automatically", body: "When they become a paying customer, the discount lands on your next bill — no claim forms." },
             ].map((s, i) => (
               <div key={i} className="glass rounded-2xl p-6 text-center relative overflow-hidden">
@@ -385,17 +359,16 @@ const Referrals = () => {
           <SectionLabel>YOUR DASHBOARD</SectionLabel>
           <SectionHeading plain="Track it" accent="live." />
           <div className="glass-strong rounded-3xl p-5 md:p-7">
-            <div className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground mb-2">
-              YOUR UNIQUE LINK
-            </div>
-            <div className="flex flex-col sm:flex-row items-stretch gap-2 mb-6">
-              <code className="flex-1 text-xs md:text-sm truncate px-4 py-3 rounded-2xl bg-background/50 border border-border/60 text-foreground/85 flex items-center">
-                {link}
-              </code>
-              <Button onClick={() => copyTo(link, "link", "Link")} className="sm:w-auto">
-                {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied === "link" ? "Copied" : "Copy"}
-              </Button>
+            <div className="rounded-2xl bg-background/50 border border-border/60 p-4 md:p-5 mb-6 text-center">
+              <div className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground mb-1">
+                REFERRALS HAPPEN ON
+              </div>
+              <div className="font-display text-xl md:text-2xl font-bold">
+                {REFERRAL_SITE_URL}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Tell other detailers to sign up there and mention your name.
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2 md:gap-3 mb-5">
@@ -483,26 +456,6 @@ const Referrals = () => {
           </div>
         </section>
 
-        {/* PRE-WRITTEN MESSAGE */}
-        <section className="relative mb-16">
-          <SectionLabel>PRE-WRITTEN MESSAGE</SectionLabel>
-          <h2 className="text-center font-display font-bold text-3xl md:text-5xl leading-[1.05] mb-10">
-            <span className="text-foreground">Copy.</span>{" "}
-            <span className="prism-text">Paste</span>
-            <span className="text-foreground">.</span>{" "}
-            <span className="prism-text">Done</span>
-            <span className="text-foreground">.</span>
-          </h2>
-          <div className="glass-strong rounded-3xl p-4 md:p-6">
-            <div className="rounded-2xl bg-background/60 border border-border/60 p-5 text-sm md:text-base text-foreground/85 leading-relaxed mb-4">
-              {message}
-            </div>
-            <Button className="w-full" size="lg" onClick={() => copyTo(message, "msg", "Message")}>
-              {copied === "msg" ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
-              {copied === "msg" ? "Copied" : "Copy message"}
-            </Button>
-          </div>
-        </section>
       </div>
     </AppShell>
   );
