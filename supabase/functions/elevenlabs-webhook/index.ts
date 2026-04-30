@@ -173,6 +173,34 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Only record/classify calls that came in on a phone number actually
+    // assigned to this company. Test calls placed from the ElevenLabs
+    // dashboard (or to any other number) are ignored.
+    if (!toNumber) {
+      console.log(
+        `Skipping conversation ${conversationId} — no called_number (likely an ElevenLabs test).`,
+      );
+      return new Response(
+        JSON.stringify({ ok: true, skipped: "no called_number" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    const { data: numberMatch } = await supabase
+      .from("company_phone_numbers")
+      .select("id")
+      .eq("company_id", mapping.company_id)
+      .eq("phone_number", toNumber)
+      .maybeSingle();
+    if (!numberMatch) {
+      console.log(
+        `Skipping conversation ${conversationId} — called_number ${toNumber} is not assigned to company ${mapping.company_id}.`,
+      );
+      return new Response(
+        JSON.stringify({ ok: true, skipped: "called_number not assigned to company" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const startedAt = meta.start_time_unix_secs
       ? new Date(meta.start_time_unix_secs * 1000).toISOString()
       : new Date().toISOString();
