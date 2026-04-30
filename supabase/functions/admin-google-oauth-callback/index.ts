@@ -3,19 +3,24 @@
 // stores everything against the target company via admin_save_company_google_tokens.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-function htmlResponse(title: string, message: string, returnTo: string, ok: boolean) {
-  const url = returnTo || "/master/companies";
-  return new Response(
-    `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
-<style>body{font-family:system-ui;background:#0b0b0c;color:#fff;display:grid;place-items:center;height:100vh;margin:0;text-align:center;padding:24px}
-.card{background:#161618;border:1px solid #2a2a2e;border-radius:16px;padding:32px;max-width:460px}
-h1{font-size:20px;margin:0 0 8px}p{color:#aaa;margin:0 0 16px}a{color:#7aa2ff}</style></head>
-<body><div class="card"><h1>${ok ? "✓ " : "⚠ "}${title}</h1><p>${message}</p>
-<p>You can close this window.</p>
-<script>setTimeout(function(){window.location.href=${JSON.stringify(url)};},1500);</script>
-<a href="${url}">Return now</a></div></body></html>`,
-    { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } },
-  );
+const APP_FALLBACK = "https://app-maker-magic-852.lovable.app/master/companies";
+
+function redirectResponse(returnTo: string, status: "success" | "error", message: string) {
+  let target = returnTo || APP_FALLBACK;
+  // Ensure absolute URL; if a relative path slipped through, prepend the app origin.
+  if (!/^https?:\/\//i.test(target)) {
+    const base = new URL(APP_FALLBACK);
+    target = `${base.origin}${target.startsWith("/") ? "" : "/"}${target}`;
+  }
+  try {
+    const u = new URL(target);
+    u.searchParams.set("google", status);
+    if (message) u.searchParams.set("google_msg", message);
+    target = u.toString();
+  } catch (_) {
+    // leave target as-is
+  }
+  return new Response(null, { status: 302, headers: { Location: target } });
 }
 
 Deno.serve(async (req) => {
@@ -35,7 +40,7 @@ Deno.serve(async (req) => {
     }
 
     if (errorParam) {
-      return htmlResponse("Connection cancelled", `Google returned: ${errorParam}`, returnTo, false);
+      return redirectResponse(returnTo, "error", `Google returned: ${errorParam}`);
     }
     if (!code || !stateNonce) throw new Error("Missing code or state");
 
@@ -84,11 +89,10 @@ Deno.serve(async (req) => {
     const scope: string = tokenJson.scope ?? "";
 
     if (!refreshToken) {
-      return htmlResponse(
-        "Reconnect needed",
-        "Google didn't return a refresh token. Have the client revoke access at myaccount.google.com/permissions and try again.",
+      return redirectResponse(
         returnTo,
-        false,
+        "error",
+        "No refresh token returned. Revoke access at myaccount.google.com/permissions and retry.",
       );
     }
 
@@ -139,15 +143,14 @@ Deno.serve(async (req) => {
       .update({ consumed_at: new Date().toISOString() })
       .eq("state", stateNonce);
 
-    return htmlResponse(
-      "Google Calendar connected",
-      googleEmail ? `Linked ${googleEmail} (${calendarSummary})` : "Connected.",
+    return redirectResponse(
       returnTo,
-      true,
+      "success",
+      googleEmail ? `Linked ${googleEmail}` : "Connected",
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("admin-google-oauth-callback error", msg);
-    return htmlResponse("Connection failed", msg, returnTo, false);
+    return redirectResponse(returnTo, "error", msg);
   }
 });
