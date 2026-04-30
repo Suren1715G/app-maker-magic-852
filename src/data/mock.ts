@@ -25,6 +25,8 @@ export type Booking = {
   phone: string;
   smsConfirmed: boolean;
   status?: "scheduled" | "completed" | "cancelled" | "no-show";
+  provider?: "google" | "acuity";
+  calendarId?: string;
 };
 
 export type SmsLog = {

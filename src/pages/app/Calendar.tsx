@@ -4,7 +4,7 @@ import { AppShell, PageHeader } from "@/components/app/AppShell";
 import { bookings as mockBookings, type Booking } from "@/data/mock";
 import { fmtTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ChevronLeft, ChevronRight, Clock, MoreVertical, CalendarX, UserX, CalendarClock, Link2, Loader2, LogOut, Users, CalendarDays } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock, MoreVertical, CalendarX, UserX, Link2, Loader2, LogOut, Users, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
@@ -130,6 +130,8 @@ const Calendar = () => {
         durationMin: a.durationMin,
         smsConfirmed: true,
         status: a.status,
+        phone: a.phone ?? "",
+        provider: "acuity",
       }));
       setItems(mapped);
     } catch (err) {
@@ -208,6 +210,10 @@ const Calendar = () => {
         const start = e.start?.dateTime ?? (e.start?.date ? `${e.start.date}T09:00:00` : new Date().toISOString());
         const end = e.end?.dateTime ?? (e.end?.date ? `${e.end.date}T10:00:00` : start);
         const durationMin = Math.max(15, Math.round((+new Date(end) - +new Date(start)) / 60000));
+        // Phone: prefer one set by our AI assistant via extendedProperties,
+        // else try to parse from the description, else empty.
+        const extPhone = e.extendedProperties?.private?.customerPhone ?? null;
+        const descPhone = (e.description || "").match(/\+?\d[\d\s().-]{7,}\d/)?.[0] ?? null;
         return {
           id: e.id,
           customer: e.summary || "(no title)",
@@ -216,6 +222,9 @@ const Calendar = () => {
           durationMin,
           smsConfirmed: true,
           status: undefined,
+          phone: extPhone ?? descPhone ?? "",
+          provider: "google",
+          calendarId: gcalStatus?.company?.calendar_id ?? undefined,
         } as Booking;
       });
       setItems(mapped);
@@ -366,11 +375,46 @@ const Calendar = () => {
     );
   };
 
-  const reschedule = (b: Booking) => {
-    const next = new Date(b.startsAt);
-    next.setDate(next.getDate() + 1);
-    setItems((p) => p.map((x) => (x.id === b.id ? { ...x, startsAt: next.toISOString() } : x)));
-    toast.success(`Moved to ${next.toLocaleDateString()} ${fmtTime(next.toISOString())}`);
+  const cancelBooking = async (b: Booking) => {
+    if (!b.provider) {
+      toast.error("This is a demo booking — connect Google or Acuity to cancel for real.");
+      return;
+    }
+    const ok = window.confirm(
+      `Cancel ${b.customer}'s ${b.service} on ${new Date(b.startsAt).toLocaleString()}?\n\n` +
+        (b.phone
+          ? `They will be texted at ${b.phone} with a reschedule link.`
+          : `No phone on file — they will NOT receive a text.`),
+    );
+    if (!ok) return;
+    const t = toast.loading("Cancelling…");
+    try {
+      const { data, error } = await supabase.functions.invoke("cancel-booking", {
+        body: {
+          provider: b.provider,
+          eventId: b.id,
+          calendarId: b.calendarId,
+          customerPhone: b.phone || null,
+          customerName: b.customer,
+          startsAt: b.startsAt,
+        },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message || "Failed");
+      setItems((p) => p.map((x) => (x.id === b.id ? { ...x, status: "cancelled" } : x)));
+      const sms = data?.sms;
+      if (sms?.sent) {
+        toast.success(`Cancelled. Text sent to ${sms.to}.`, { id: t });
+      } else if (sms?.error) {
+        toast.success(`Cancelled, but no text sent: ${sms.error}`, { id: t });
+      } else {
+        toast.success("Cancelled.", { id: t });
+      }
+      // Re-pull from provider so we stay in sync
+      if (acuityActive) loadAcuityAppointments();
+      else loadEvents();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to cancel", { id: t });
+    }
   };
 
   const navigate = (dir: -1 | 0 | 1) => {
@@ -643,7 +687,7 @@ const Calendar = () => {
         <DayDetail
           day={selected}
           events={eventsFor(selected)}
-          onReschedule={reschedule}
+          onCancel={cancelBooking}
           onStatus={updateStatus}
         />
       )}
@@ -862,11 +906,11 @@ const DayView = ({ day, events }: { day: Date; events: Booking[] }) => {
 
 /* ---------- Detail under month ---------- */
 const DayDetail = ({
-  day, events, onReschedule, onStatus,
+  day, events, onCancel, onStatus,
 }: {
   day: Date;
   events: Booking[];
-  onReschedule: (b: Booking) => void;
+  onCancel: (b: Booking) => void;
   onStatus: (id: string, s: NonNullable<Booking["status"]>) => void;
 }) => (
   <section className="mt-6">
@@ -913,9 +957,6 @@ const DayDetail = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => onReschedule(b)}>
-                  <CalendarClock className="h-4 w-4" /> Reschedule (+1d)
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onStatus(b.id, "completed")}>
                   <CheckCircle2 className="h-4 w-4" /> Mark completed
                 </DropdownMenuItem>
@@ -924,10 +965,10 @@ const DayDetail = ({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => onStatus(b.id, "cancelled")}
+                  onClick={() => onCancel(b)}
                   className="text-destructive focus:text-destructive"
                 >
-                  <CalendarX className="h-4 w-4" /> Cancel booking
+                  <CalendarX className="h-4 w-4" /> Cancel & text customer
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
