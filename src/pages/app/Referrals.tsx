@@ -144,6 +144,22 @@ const Referrals = () => {
 
         <PageHeader title="Referrals" subtitle="Give one month free, get one back." />
 
+        {/* WEBSITE CALLOUT */}
+        <section className="relative mb-8">
+          <div className="glass-strong rounded-2xl p-5 md:p-6 text-center gradient-border">
+            <div className="font-mono text-[10px] tracking-[0.25em] text-primary/70 mb-2">
+              // REFERRALS HAPPEN ON OUR WEBSITE
+            </div>
+            <div className="font-display font-bold text-xl md:text-2xl">
+              Referrals can be done on our website at{" "}
+              <span className="prism-text">{REFERRAL_SITE_URL}</span>
+            </div>
+            <div className="text-sm text-muted-foreground mt-2">
+              Send other detailers there to sign up — credit lands here automatically.
+            </div>
+          </div>
+        </section>
+
         {/* HERO STATUS */}
         <section data-tour="ref-status" className="relative mb-20">
           <div className="glass-strong rounded-3xl p-6 md:p-8 text-center overflow-hidden gradient-border">
