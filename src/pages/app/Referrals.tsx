@@ -127,30 +127,6 @@ const Referrals = () => {
     };
   }, [user?.id]);
 
-  const link = refCode
-    ? `${REFERRAL_SITE_URL}/?ref=${refCode}`
-    : REFERRAL_SITE_URL;
-  const message = `Hey, I use this AI receptionist that answers all my calls and books appointments automatically. Costs $${BASE_PRICE}/month and pays for itself easily. Check it out: ${link}`;
-
-  const [copied, setCopied] = useState<"link" | "msg" | null>(null);
-  const copyTo = async (text: string, kind: "link" | "msg", label: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(kind);
-      toast.success(`${label} copied`);
-      setTimeout(() => setCopied((c) => (c === kind ? null : c)), 1800);
-    } catch {
-      toast.error("Couldn't copy");
-    }
-  };
-
-  const share = async () => {
-    if (navigator.share) {
-      try { await navigator.share({ title: "Try SGS", url: link }); return; } catch {}
-    }
-    copyTo(link, "link", "Link");
-  };
-
   const [picked, setPicked] = useState(Math.max(1, earned));
   const { off: pickedOff, price: pickedPrice } = priceFor(picked);
   const animatedPrice = useCountUp(pickedPrice, 500);
@@ -355,8 +331,8 @@ const Referrals = () => {
           <SectionHeading plain="Three steps." accent="Zero effort." />
           <div className="grid md:grid-cols-3 gap-3 md:gap-4">
             {[
-              { icon: Link2, title: "Copy your link", body: "Every account gets a unique referral URL. One tap to copy from your dashboard." },
-              { icon: Send, title: "Send it to detailers", body: "Drop it in a DM, text, group chat, or email. Anyone running an auto detail shop." },
+              { icon: Globe, title: "Send detailers to our site", body: `Tell other shops to sign up at ${REFERRAL_SITE_URL} and mention your name.` },
+              { icon: Send, title: "They sign up", body: "When they become a paying customer, you get credit automatically." },
               { icon: Sparkles, title: "Discount applies automatically", body: "When they become a paying customer, the discount lands on your next bill — no claim forms." },
             ].map((s, i) => (
               <div key={i} className="glass rounded-2xl p-6 text-center relative overflow-hidden">
