@@ -14,6 +14,78 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+type Classification = { tag: "lead" | "booked" | "follow-up" | "spam" | null; booked: boolean };
+
+async function classifyCall(opts: {
+  summary: string;
+  transcript: { speaker: string; text: string }[];
+}): Promise<Classification> {
+  if (!LOVABLE_API_KEY) return { tag: null, booked: false };
+  const transcriptText = opts.transcript
+    .map((t) => `${t.speaker}: ${t.text}`)
+    .join("\n")
+    .slice(0, 6000);
+  const prompt = `You are classifying a phone call to a small business AI receptionist.
+
+SUMMARY:
+${opts.summary || "(none)"}
+
+TRANSCRIPT:
+${transcriptText || "(empty)"}
+
+Classify this call. Respond with a JSON tool call.
+- tag "booked": caller successfully scheduled/confirmed an appointment.
+- tag "lead": genuine prospective customer asking about services/pricing/availability but no booking confirmed.
+- tag "follow-up": existing customer or caller who needs a callback / unresolved question / message taken.
+- tag "spam": wrong number, robocall, solicitation, telemarketer, or nonsense.
+- booked: true only if an appointment was actually scheduled in this call.`;
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content: prompt }],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "classify_call",
+              description: "Assign a tag and booking status to the call.",
+              parameters: {
+                type: "object",
+                properties: {
+                  tag: { type: "string", enum: ["lead", "booked", "follow-up", "spam"] },
+                  booked: { type: "boolean" },
+                },
+                required: ["tag", "booked"],
+                additionalProperties: false,
+              },
+            },
+          },
+        ],
+        tool_choice: { type: "function", function: { name: "classify_call" } },
+      }),
+    });
+    if (!res.ok) {
+      console.warn("classifyCall non-OK", res.status, await res.text());
+      return { tag: null, booked: false };
+    }
+    const json = await res.json();
+    const args = json?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+    if (!args) return { tag: null, booked: false };
+    const parsed = JSON.parse(args);
+    return { tag: parsed.tag ?? null, booked: Boolean(parsed.booked) };
+  } catch (e) {
+    console.warn("classifyCall error", e);
+    return { tag: null, booked: false };
+  }
+}
 
 function buildSummary(transcript: any[]): string {
   if (!Array.isArray(transcript) || transcript.length === 0) return "";
@@ -107,6 +179,14 @@ Deno.serve(async (req) => {
     const duration =
       meta.call_duration_secs ?? meta.duration_secs ?? data.duration_secs ?? 0;
 
+    const summary =
+      data.analysis?.transcript_summary ??
+      data.analysis?.summary ??
+      buildSummary(data.transcript ?? []);
+
+    const classification = await classifyCall({ summary, transcript });
+    const finalStatus = classification.booked ? "booked" : "answered";
+
     const { error } = await supabase.from("calls").upsert(
       {
         company_id: mapping.company_id,
@@ -116,18 +196,17 @@ Deno.serve(async (req) => {
         phone,
         to_number: toNumber,
         direction: "inbound",
-        status: "answered",
+        status: finalStatus,
+        tag: classification.tag,
         duration_sec: duration,
-        summary:
-          data.analysis?.transcript_summary ??
-          data.analysis?.summary ??
-          buildSummary(data.transcript ?? []),
+        summary,
         transcript,
         recording_url: data.audio_url ?? null,
         metadata: {
           agent_id: agentId,
           conversation_id: conversationId,
           analysis: data.analysis ?? null,
+          classification,
         },
         started_at: startedAt,
       },
