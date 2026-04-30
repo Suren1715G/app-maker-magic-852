@@ -259,7 +259,7 @@ const Calendar = () => {
         toast.error("Please sign in first");
         return;
       }
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-oauth-start?return_to=${encodeURIComponent("/calendar")}`;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-oauth-start?return_to=${encodeURIComponent(`${window.location.origin}/calendar`)}`;
       const res = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
