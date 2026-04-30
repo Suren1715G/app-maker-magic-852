@@ -906,11 +906,11 @@ const DayView = ({ day, events }: { day: Date; events: Booking[] }) => {
 
 /* ---------- Detail under month ---------- */
 const DayDetail = ({
-  day, events, onReschedule, onStatus,
+  day, events, onCancel, onStatus,
 }: {
   day: Date;
   events: Booking[];
-  onReschedule: (b: Booking) => void;
+  onCancel: (b: Booking) => void;
   onStatus: (id: string, s: NonNullable<Booking["status"]>) => void;
 }) => (
   <section className="mt-6">
@@ -957,9 +957,6 @@ const DayDetail = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => onReschedule(b)}>
-                  <CalendarClock className="h-4 w-4" /> Reschedule (+1d)
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onStatus(b.id, "completed")}>
                   <CheckCircle2 className="h-4 w-4" /> Mark completed
                 </DropdownMenuItem>
@@ -968,10 +965,10 @@ const DayDetail = ({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => onStatus(b.id, "cancelled")}
+                  onClick={() => onCancel(b)}
                   className="text-destructive focus:text-destructive"
                 >
-                  <CalendarX className="h-4 w-4" /> Cancel booking
+                  <CalendarX className="h-4 w-4" /> Cancel & text customer
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
