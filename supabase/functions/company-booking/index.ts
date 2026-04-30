@@ -106,6 +106,7 @@ Deno.serve(async (req) => {
         startsAt: a.datetime,
         durationMin: Number(a.duration ?? 30),
         status: a.canceled ? "cancelled" : undefined,
+        phone: a.phone ?? null,
       }));
       return json({ items });
     }
