@@ -67,7 +67,7 @@ export function CompanyBookingIntegration({ companyId }: { companyId: string }) 
         },
         body: JSON.stringify({
           company_id: companyId,
-          return_to: window.location.pathname,
+          return_to: `${window.location.origin}${window.location.pathname}`,
         }),
       });
       const json = await res.json();
