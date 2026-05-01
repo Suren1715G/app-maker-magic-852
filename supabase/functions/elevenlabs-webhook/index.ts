@@ -147,16 +147,37 @@ Deno.serve(async (req) => {
 
     const transcript = normalizeTranscript(data.transcript);
     const meta = data.metadata ?? {};
+    const phoneCall = meta.phone_call ?? {};
+    const dynamicVariables =
+      data.dynamic_variables ??
+      data.conversation_initiation_client_data?.dynamic_variables ??
+      {};
     const phone =
       meta.caller_id ??
       meta.phone_number ??
-      data.dynamic_variables?.system__caller_id ??
+      phoneCall.external_number ??
+      dynamicVariables.system__caller_id ??
       null;
     const toNumber =
       meta.called_number ??
       meta.to_number ??
-      data.dynamic_variables?.system__called_number ??
+      phoneCall.agent_number ??
+      dynamicVariables.system__called_number ??
       null;
+
+    const startedAt = meta.start_time_unix_secs
+      ? new Date(meta.start_time_unix_secs * 1000).toISOString()
+      : new Date().toISOString();
+    const duration =
+      meta.call_duration_secs ?? meta.duration_secs ?? data.duration_secs ?? 0;
+
+    const summary =
+      data.analysis?.transcript_summary ??
+      data.analysis?.summary ??
+      buildSummary(data.transcript ?? []);
+
+    const classification = await classifyCall({ summary, transcript });
+    const finalStatus = classification.booked ? "booked" : "answered";
 
     // Skip in-app / web widget conversations — these are the business owner
     // talking to their own AI assistant inside the app, not a real customer
@@ -164,6 +185,66 @@ Deno.serve(async (req) => {
     // (and usually a called_number) populated by the telephony layer.
     const isPhoneCall = Boolean(phone) || Boolean(toNumber);
     if (!isPhoneCall) {
+      // Some ElevenLabs/Twilio phone integrations omit caller metadata in the
+      // post-call webhook even though Twilio has already logged the call. When
+      // that happens, attach the transcript to the most recent Twilio call for
+      // the same company instead of dropping it.
+      const recentSince = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      const { data: recentCalls, error: recentCallsError } = await supabase
+        .from("calls")
+          .select("id, duration_sec, metadata")
+        .eq("company_id", mapping.company_id)
+        .eq("source", "twilio")
+          .or("transcript.is.null,transcript.eq.[]")
+        .gte("created_at", recentSince)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (recentCallsError) throw recentCallsError;
+
+      const recentCall = recentCalls?.find((call) => {
+        const twilioDuration = Number(call.duration_sec ?? 0);
+        const elevenDuration = Number(duration ?? 0);
+        return elevenDuration === 0 || Math.abs(twilioDuration - elevenDuration) <= 180;
+      }) ?? recentCalls?.[0];
+
+      if (recentCall) {
+        const existingMetadata =
+          recentCall.metadata && typeof recentCall.metadata === "object"
+            ? recentCall.metadata as Record<string, unknown>
+            : {};
+        const { error: updateError } = await supabase
+          .from("calls")
+          .update({
+            status: finalStatus,
+            tag: classification.tag,
+            duration_sec: duration,
+            summary,
+            transcript,
+            recording_url: data.audio_url ?? null,
+            metadata: {
+              ...existingMetadata,
+              elevenlabs: {
+                agent_id: agentId,
+                conversation_id: conversationId,
+                analysis: data.analysis ?? null,
+                classification,
+                attached_without_phone_metadata: true,
+              },
+            },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", recentCall.id);
+        if (updateError) throw updateError;
+
+        console.log(
+          `Attached metadata-free ElevenLabs transcript ${conversationId} to Twilio call ${recentCall.id}`,
+        );
+        return new Response(JSON.stringify({ ok: true, attached_to: recentCall.id }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       console.log(
         `Skipping in-app conversation ${conversationId} (no phone metadata)`,
       );
@@ -200,20 +281,6 @@ Deno.serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    const startedAt = meta.start_time_unix_secs
-      ? new Date(meta.start_time_unix_secs * 1000).toISOString()
-      : new Date().toISOString();
-    const duration =
-      meta.call_duration_secs ?? meta.duration_secs ?? data.duration_secs ?? 0;
-
-    const summary =
-      data.analysis?.transcript_summary ??
-      data.analysis?.summary ??
-      buildSummary(data.transcript ?? []);
-
-    const classification = await classifyCall({ summary, transcript });
-    const finalStatus = classification.booked ? "booked" : "answered";
 
     const { error } = await supabase.from("calls").upsert(
       {
