@@ -102,10 +102,16 @@ const Home = () => {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const callsToday = liveCalls.filter((c) => new Date(c.startedAt) >= startOfToday).length;
+  const bookedToday = liveCalls.filter(
+    (c) => c.status === "booked" && new Date(c.startedAt) >= startOfToday,
+  ).length;
+  const liveConversionRate = callsToday > 0 ? bookedToday / callsToday : 0;
 
   const stats = {
     ...baseStats,
     callsToday: hasLive ? callsToday : baseStats.callsToday,
+    bookingsToday: hasLive ? bookedToday : baseStats.bookingsToday,
+    conversionRate: hasLive ? liveConversionRate : baseStats.conversionRate,
   };
 
   const recent = hasLive
@@ -184,7 +190,7 @@ const Home = () => {
 
       <div data-tour="home-stats" className="grid grid-cols-2 gap-3 mb-8">
         <StatCard label="Calls today" value={stats.callsToday} hint={isNew ? "—" : `${Math.round(stats.conversionRate * 100)}% booked`} icon={<Phone className="h-4 w-4" />} accent />
-        <StatCard label="Bookings" value={stats.bookingsToday} hint={isNew ? "—" : `${fmtMoney(stats.revenueBookedToday)} booked`} icon={<CalendarDays className="h-4 w-4" />} />
+        <StatCard label="Bookings" value={stats.bookingsToday} hint={hasLive ? "From today's calls" : isNew ? "—" : `${fmtMoney(stats.revenueBookedToday)} booked`} icon={<CalendarDays className="h-4 w-4" />} />
         <StatCard label="SMS sent" value={stats.smsSent} hint={isNew ? "—" : "Confirmations & replies"} icon={<Sparkles className="h-4 w-4" />} />
       </div>
 
