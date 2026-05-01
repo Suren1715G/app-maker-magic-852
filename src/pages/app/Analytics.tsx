@@ -20,7 +20,7 @@ const Analytics = () => {
   const isNew = useIsNewCustomer();
   const { companyId } = useAuth();
   const [range, setRange] = useState<(typeof ranges)[number]["id"]>("7d");
-  const [realCalls, setRealCalls] = useState<{ started_at: string; duration_sec: number | null }[]>([]);
+  const [realCalls, setRealCalls] = useState<{ started_at: string; duration_sec: number | null; status?: string | null }[]>([]);
 
   const rangeStart = useMemo(() => {
     const d = new Date();
@@ -37,7 +37,7 @@ const Analytics = () => {
     (async () => {
       const { data } = await supabase
         .from("calls")
-        .select("started_at,duration_sec")
+        .select("started_at,duration_sec,status")
         .eq("company_id", companyId)
         .gte("started_at", rangeStart.toISOString())
         .order("started_at", { ascending: true })
@@ -72,7 +72,11 @@ const Analytics = () => {
       // weekly series
       for (const bucket of days) {
         const next = new Date(bucket.date); next.setDate(next.getDate() + 1);
-        if (t >= bucket.date && t < next) { bucket.calls += 1; break; }
+        if (t >= bucket.date && t < next) {
+          bucket.calls += 1;
+          if (c.status === "booked") bucket.bookings += 1;
+          break;
+        }
       }
     }
     return {
