@@ -275,20 +275,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    const startedAt = meta.start_time_unix_secs
-      ? new Date(meta.start_time_unix_secs * 1000).toISOString()
-      : new Date().toISOString();
-    const duration =
-      meta.call_duration_secs ?? meta.duration_secs ?? data.duration_secs ?? 0;
-
-    const summary =
-      data.analysis?.transcript_summary ??
-      data.analysis?.summary ??
-      buildSummary(data.transcript ?? []);
-
-    const classification = await classifyCall({ summary, transcript });
-    const finalStatus = classification.booked ? "booked" : "answered";
-
     const { error } = await supabase.from("calls").upsert(
       {
         company_id: mapping.company_id,
