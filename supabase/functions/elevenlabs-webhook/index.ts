@@ -147,15 +147,22 @@ Deno.serve(async (req) => {
 
     const transcript = normalizeTranscript(data.transcript);
     const meta = data.metadata ?? {};
+    const phoneCall = meta.phone_call ?? {};
+    const dynamicVariables =
+      data.dynamic_variables ??
+      data.conversation_initiation_client_data?.dynamic_variables ??
+      {};
     const phone =
       meta.caller_id ??
       meta.phone_number ??
-      data.dynamic_variables?.system__caller_id ??
+      phoneCall.external_number ??
+      dynamicVariables.system__caller_id ??
       null;
     const toNumber =
       meta.called_number ??
       meta.to_number ??
-      data.dynamic_variables?.system__called_number ??
+      phoneCall.agent_number ??
+      dynamicVariables.system__called_number ??
       null;
 
     const startedAt = meta.start_time_unix_secs
