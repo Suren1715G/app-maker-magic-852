@@ -192,10 +192,10 @@ Deno.serve(async (req) => {
       const recentSince = new Date(Date.now() - 15 * 60 * 1000).toISOString();
       const { data: recentCalls, error: recentCallsError } = await supabase
         .from("calls")
-        .select("id, duration_sec, metadata")
+          .select("id, duration_sec, metadata")
         .eq("company_id", mapping.company_id)
         .eq("source", "twilio")
-        .is("transcript", null)
+          .or("transcript.is.null,transcript.eq.[]")
         .gte("created_at", recentSince)
         .order("created_at", { ascending: false })
         .limit(5);
