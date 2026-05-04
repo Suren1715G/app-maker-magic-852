@@ -218,7 +218,7 @@ const Referrals = () => {
                     </div>
                     <div className={cn(
                       "font-display font-bold text-lg md:text-2xl",
-                      t.count === 4 && "text-muted-foreground/80"
+                      t.count === 5 && "text-muted-foreground/80"
                     )}>
                       {t.label}
                     </div>
