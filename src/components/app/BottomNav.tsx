@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Phone, CalendarDays, MessageSquare,
-  BarChart3, Bell, CreditCard, Gift, Bot, LifeBuoy, Settings, MoreHorizontal, LogOut, StickyNote, Sparkles,
+  BarChart3, Bell, CreditCard, Gift, Bot, LifeBuoy, Settings, MoreHorizontal, LogOut, StickyNote, Sparkles, Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -27,6 +27,7 @@ const more = [
   { to: "/referrals", label: "Referrals", icon: Gift, hint: "Earn free months" },
   { to: "/support", label: "Support", icon: LifeBuoy, hint: "Help & FAQ" },
   { to: "/settings", label: "Settings", icon: Settings, hint: "Business & AI" },
+  { to: "/privacy", label: "Privacy Policy", icon: Shield, hint: "How we handle data" },
 ];
 
 export function BottomNav() {
