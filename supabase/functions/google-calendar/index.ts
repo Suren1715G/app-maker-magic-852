@@ -59,6 +59,30 @@ async function refreshIfNeeded(admin: any, row: any) {
   return newAccess;
 }
 
+async function fetchCalendarList(accessToken: string, minAccessRole?: string) {
+  const items: any[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const url = new URL("https://www.googleapis.com/calendar/v3/users/me/calendarList");
+    url.searchParams.set("maxResults", "250");
+    url.searchParams.set("showHidden", "true");
+    if (minAccessRole) url.searchParams.set("minAccessRole", minAccessRole);
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false as const, status: res.status, data };
+
+    items.push(...(data.items ?? []));
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  return { ok: true as const, items };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -147,13 +171,9 @@ Deno.serve(async (req) => {
     if (action === "list_my_calendars") {
       if (!row) return json({ error: "not_connected" }, 400);
       const accessToken = await refreshIfNeeded(admin, row);
-      const res = await fetch(
-        "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250",
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
-      const data = await res.json();
-      if (!res.ok) return json({ error: data }, res.status);
-      const items = (data.items ?? []).map((c: any) => ({
+      const list = await fetchCalendarList(accessToken);
+      if (!list.ok) return json({ error: list.data }, list.status);
+      const items = list.items.map((c: any) => ({
         id: c.id,
         summary: c.summary,
         primary: !!c.primary,
@@ -195,13 +215,9 @@ Deno.serve(async (req) => {
       if (!ownerRow) return json({ error: "owner_not_connected" }, 400);
 
       const accessToken = await refreshIfNeeded(admin, ownerRow);
-      const res = await fetch(
-        "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250",
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
-      const data = await res.json();
-      if (!res.ok) return json({ error: data }, res.status);
-      const items = (data.items ?? []).map((c: any) => ({
+      const list = await fetchCalendarList(accessToken);
+      if (!list.ok) return json({ error: list.data }, list.status);
+      const items = list.items.map((c: any) => ({
         id: c.id,
         summary: c.summary,
         primary: !!c.primary,
