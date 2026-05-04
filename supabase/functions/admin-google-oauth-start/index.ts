@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const companyId = body.company_id as string | undefined;
+    const lineId = body.line_id as string | undefined;
     const returnTo = (body.return_to as string | undefined) ?? "/master/companies";
     if (!companyId) throw new Error("Missing company_id");
 
@@ -61,6 +62,7 @@ Deno.serve(async (req) => {
         state,
         admin_user_id: adminId,
         company_id: companyId,
+        line_id: lineId ?? null,
       });
     if (insErr) throw new Error(`Failed to create pending flow: ${insErr.message}`);
 

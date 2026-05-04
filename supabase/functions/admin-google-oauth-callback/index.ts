@@ -126,17 +126,32 @@ Deno.serve(async (req) => {
 
     const expiresAt = new Date(Date.now() + (expiresIn - 60) * 1000).toISOString();
 
-    const { error: rpcErr } = await admin.rpc("admin_save_company_google_tokens", {
-      _company_id: companyId,
-      _google_email: googleEmail,
-      _access_token: accessToken,
-      _refresh_token: refreshToken,
-      _expires_at: expiresAt,
-      _scope: scope,
-      _calendar_id: calendarId,
-      _calendar_summary: calendarSummary,
-    });
-    if (rpcErr) throw new Error(`Failed to save tokens: ${rpcErr.message}`);
+    const lineId = (pending as any).line_id as string | null;
+    if (lineId) {
+      const { error: rpcErr } = await admin.rpc("admin_save_line_google_tokens", {
+        _line_id: lineId,
+        _google_email: googleEmail,
+        _access_token: accessToken,
+        _refresh_token: refreshToken,
+        _expires_at: expiresAt,
+        _scope: scope,
+        _calendar_id: calendarId,
+        _calendar_summary: calendarSummary,
+      });
+      if (rpcErr) throw new Error(`Failed to save line tokens: ${rpcErr.message}`);
+    } else {
+      const { error: rpcErr } = await admin.rpc("admin_save_company_google_tokens", {
+        _company_id: companyId,
+        _google_email: googleEmail,
+        _access_token: accessToken,
+        _refresh_token: refreshToken,
+        _expires_at: expiresAt,
+        _scope: scope,
+        _calendar_id: calendarId,
+        _calendar_summary: calendarSummary,
+      });
+      if (rpcErr) throw new Error(`Failed to save tokens: ${rpcErr.message}`);
+    }
 
     await admin
       .from("pending_admin_google_oauth")

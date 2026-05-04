@@ -224,6 +224,36 @@ export function LineBookingConfig({
     }
   };
 
+  const connectNewGoogleForLine = async () => {
+    setBusy(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Not signed in");
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-google-oauth-start`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          company_id: companyId,
+          line_id: line.id,
+          return_to: `${window.location.origin}${window.location.pathname}`,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      window.location.href = json.url;
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to start Google OAuth");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const provider = line.booking_provider;
 
   return (
@@ -265,6 +295,17 @@ export function LineBookingConfig({
         <Button size="sm" variant="outline" onClick={openAcuity} disabled={busy} className="h-7 text-xs">
           <Link2 className="h-3 w-3 mr-1" /> Acuity
         </Button>
+        {admin && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={connectNewGoogleForLine}
+            disabled={busy}
+            className="h-7 text-xs"
+          >
+            <Link2 className="h-3 w-3 mr-1" /> Connect new Google
+          </Button>
+        )}
         {provider !== "none" && (
           <Button size="sm" variant="ghost" onClick={clear} disabled={busy} className="h-7 text-xs text-destructive hover:text-destructive">
             <Trash2 className="h-3 w-3 mr-1" /> Clear

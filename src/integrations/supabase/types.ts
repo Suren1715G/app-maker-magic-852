@@ -522,6 +522,7 @@ export type Database = {
           created_at: string
           expires_at: string
           id: string
+          line_id: string | null
           state: string
         }
         Insert: {
@@ -531,6 +532,7 @@ export type Database = {
           created_at?: string
           expires_at?: string
           id?: string
+          line_id?: string | null
           state: string
         }
         Update: {
@@ -540,6 +542,7 @@ export type Database = {
           created_at?: string
           expires_at?: string
           id?: string
+          line_id?: string | null
           state?: string
         }
         Relationships: []
@@ -929,6 +932,19 @@ export type Database = {
           _company_id: string
           _expires_at: string
           _google_email: string
+          _refresh_token: string
+          _scope: string
+        }
+        Returns: undefined
+      }
+      admin_save_line_google_tokens: {
+        Args: {
+          _access_token: string
+          _calendar_id: string
+          _calendar_summary: string
+          _expires_at: string
+          _google_email: string
+          _line_id: string
           _refresh_token: string
           _scope: string
         }
