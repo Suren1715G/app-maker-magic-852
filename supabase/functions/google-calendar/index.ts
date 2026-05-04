@@ -162,6 +162,54 @@ Deno.serve(async (req) => {
       return json({ items });
     }
 
+    // List calendars for a specific phone line's connected Google account.
+    // Authorized if caller is global admin OR a member of the line's company.
+    // Uses the owner's stored tokens (owner_user_id can be a real user id or
+    // the synthetic line_id used by admin-connected lines).
+    if (action === "list_line_calendars") {
+      const lineId = body.line_id as string | undefined;
+      if (!lineId) return json({ error: "Missing line_id" }, 400);
+
+      const { data: line } = await admin
+        .from("company_phone_numbers")
+        .select("company_id, shared_calendar_owner_user_id")
+        .eq("id", lineId)
+        .maybeSingle();
+      if (!line) return json({ error: "line_not_found" }, 404);
+
+      // Authz
+      const { data: roles } = await admin
+        .from("user_roles").select("role").eq("user_id", userId);
+      const isAdmin = (roles ?? []).some((r: any) => r.role === "admin");
+      const inCompany = profile?.company_id === line.company_id;
+      if (!isAdmin && !inCompany) return json({ error: "forbidden" }, 403);
+
+      const ownerId = line.shared_calendar_owner_user_id;
+      if (!ownerId) return json({ error: "no_owner" }, 400);
+
+      const { data: ownerRow } = await admin
+        .from("user_google_tokens")
+        .select("*")
+        .eq("user_id", ownerId)
+        .maybeSingle();
+      if (!ownerRow) return json({ error: "owner_not_connected" }, 400);
+
+      const accessToken = await refreshIfNeeded(admin, ownerRow);
+      const res = await fetch(
+        "https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=writer&maxResults=250",
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      const data = await res.json();
+      if (!res.ok) return json({ error: data }, res.status);
+      const items = (data.items ?? []).map((c: any) => ({
+        id: c.id,
+        summary: c.summary,
+        primary: !!c.primary,
+        accessRole: c.accessRole,
+      }));
+      return json({ items, owner_user_id: ownerId });
+    }
+
     if (action === "set_shared_calendar") {
       if (!companyId) return json({ error: "no_company" }, 400);
       if (!row) return json({ error: "not_connected" }, 400);
