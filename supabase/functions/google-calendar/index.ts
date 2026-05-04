@@ -45,7 +45,12 @@ async function refreshIfNeeded(admin: any, row: any) {
     }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(`Refresh failed: ${JSON.stringify(data)}`);
+  if (!res.ok) {
+    const err: any = new Error(`Refresh failed: ${JSON.stringify(data)}`);
+    err.code = "reconnect_required";
+    err.googleError = data;
+    throw err;
+  }
 
   const newAccess = data.access_token as string;
   const expiresIn = (data.expires_in as number) ?? 3600;
@@ -344,7 +349,18 @@ Deno.serve(async (req) => {
     return json({ error: "Unknown action" }, 400);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
+    const code = (err as any)?.code;
     console.error("google-calendar error", msg);
+    if (code === "reconnect_required") {
+      return json(
+        {
+          error: "reconnect_required",
+          message:
+            "Google connection expired or was revoked. Please reconnect the Google account for this line.",
+        },
+        401,
+      );
+    }
     return json({ error: msg }, 500);
   }
 });
