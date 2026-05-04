@@ -1,4 +1,6 @@
 import { Card } from "@/components/ui/card";
+import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
 const thirdParties = [
   { name: "ElevenLabs", purpose: "AI voice call audio processing & storage" },
@@ -146,6 +148,13 @@ export default function Privacy() {
   return (
     <main className="min-h-screen w-full">
       <div className="mx-auto w-full max-w-[720px] px-5 sm:px-8 py-12 md:py-16">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-8"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to dashboard
+        </Link>
         <header className="mb-10">
           <h1 className="font-display text-4xl md:text-5xl font-semibold tracking-tight">
             Privacy Policy
