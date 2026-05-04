@@ -265,6 +265,17 @@ export function LineBookingConfig({
         <Button size="sm" variant="outline" onClick={openAcuity} disabled={busy} className="h-7 text-xs">
           <Link2 className="h-3 w-3 mr-1" /> Acuity
         </Button>
+        {admin && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={connectNewGoogleForLine}
+            disabled={busy}
+            className="h-7 text-xs"
+          >
+            <Link2 className="h-3 w-3 mr-1" /> Connect new Google
+          </Button>
+        )}
         {provider !== "none" && (
           <Button size="sm" variant="ghost" onClick={clear} disabled={busy} className="h-7 text-xs text-destructive hover:text-destructive">
             <Trash2 className="h-3 w-3 mr-1" /> Clear
