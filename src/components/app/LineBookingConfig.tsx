@@ -148,7 +148,18 @@ export function LineBookingConfig({
       const { data, error } = res;
       setLoadingCals(false);
       if (error || data?.error) {
-        toast.error(data?.error ?? error?.message ?? "Failed to load calendars");
+        if (data?.error === "reconnect_required") {
+          toast.error(
+            data?.message ??
+              "Google connection expired. Reconnect the Google account for this line.",
+          );
+        } else {
+          toast.error(
+            (typeof data?.error === "string" ? data.error : data?.message) ??
+              error?.message ??
+              "Failed to load calendars",
+          );
+        }
         return;
       }
       setCalendars((data?.items ?? []) as Calendar[]);
@@ -165,7 +176,17 @@ export function LineBookingConfig({
         body: { action: "list_line_calendars", line_id: line.id },
       });
       if (error || data?.error) {
-        throw new Error(data?.error ?? error?.message ?? "Failed");
+        if (data?.error === "reconnect_required") {
+          throw new Error(
+            data?.message ??
+              "Google connection expired. Reconnect the Google account for this line.",
+          );
+        }
+        throw new Error(
+          (typeof data?.error === "string" ? data.error : data?.message) ??
+            error?.message ??
+            "Failed to load calendars",
+        );
       }
       setCalendars((data?.items ?? []) as Calendar[]);
       setCalendarId(line.shared_calendar_id ?? "");
