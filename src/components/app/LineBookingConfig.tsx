@@ -55,6 +55,7 @@ export function LineBookingConfig({
   const [busy, setBusy] = useState(false);
 
   const [googleOpen, setGoogleOpen] = useState(false);
+  const [changeCalOpen, setChangeCalOpen] = useState(false);
   const [owners, setOwners] = useState<GoogleOwner[]>([]);
   const [ownerId, setOwnerId] = useState<string>("");
   const [calendars, setCalendars] = useState<Calendar[]>([]);
@@ -124,15 +125,27 @@ export function LineBookingConfig({
   useEffect(() => {
     if (!googleOpen || !ownerId) return;
     (async () => {
+      setLoadingCals(true);
       const { data: { user } } = await supabase.auth.getUser();
-      if (user?.id !== ownerId) {
-        setCalendars([]); // can't enumerate someone else's calendars
+      // If the picked owner is the current logged-in user, use their own
+      // calendars. Otherwise (picking the line's already-connected owner —
+      // including a synthetic admin-connected owner), use the line endpoint
+      // which authenticates against the stored tokens for that line.
+      let res;
+      if (user?.id === ownerId) {
+        res = await supabase.functions.invoke("google-calendar", {
+          body: { action: "list_my_calendars" },
+        });
+      } else if (ownerId === line.shared_calendar_owner_user_id) {
+        res = await supabase.functions.invoke("google-calendar", {
+          body: { action: "list_line_calendars", line_id: line.id },
+        });
+      } else {
+        setCalendars([]);
+        setLoadingCals(false);
         return;
       }
-      setLoadingCals(true);
-      const { data, error } = await supabase.functions.invoke("google-calendar", {
-        body: { action: "list_my_calendars" },
-      });
+      const { data, error } = res;
       setLoadingCals(false);
       if (error || data?.error) {
         toast.error(data?.error ?? error?.message ?? "Failed to load calendars");
@@ -140,7 +153,51 @@ export function LineBookingConfig({
       }
       setCalendars((data?.items ?? []) as Calendar[]);
     })();
-  }, [googleOpen, ownerId]);
+  }, [googleOpen, ownerId, line.id, line.shared_calendar_owner_user_id]);
+
+  // "Change calendar" — for lines already connected to Google, just list
+  // calendars from the line's stored owner tokens and save back.
+  const openChangeCalendar = async () => {
+    setBusy(true);
+    setLoadingCals(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("google-calendar", {
+        body: { action: "list_line_calendars", line_id: line.id },
+      });
+      if (error || data?.error) {
+        throw new Error(data?.error ?? error?.message ?? "Failed");
+      }
+      setCalendars((data?.items ?? []) as Calendar[]);
+      setCalendarId(line.shared_calendar_id ?? "");
+      setChangeCalOpen(true);
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to load calendars");
+    } finally {
+      setLoadingCals(false);
+      setBusy(false);
+    }
+  };
+
+  const saveChangeCalendar = async () => {
+    if (!calendarId || !line.shared_calendar_owner_user_id) return;
+    const cal = calendars.find((c) => c.id === calendarId);
+    setBusy(true);
+    try {
+      await callRpc(admin ? "admin_set_line_google" : "company_set_line_google", {
+        _line_id: line.id,
+        _owner_user_id: line.shared_calendar_owner_user_id,
+        _calendar_id: calendarId,
+        _calendar_summary: cal?.summary ?? null,
+      });
+      toast.success("Calendar updated");
+      setChangeCalOpen(false);
+      onChanged();
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const callRpc = async (name: string, args: Record<string, unknown>) => {
     const { error } = await supabase.rpc(name as any, args as any);
@@ -292,6 +349,11 @@ export function LineBookingConfig({
         <Button size="sm" variant="outline" onClick={openGoogle} disabled={busy} className="h-7 text-xs">
           <Link2 className="h-3 w-3 mr-1" /> Google
         </Button>
+        {provider === "google" && (
+          <Button size="sm" variant="outline" onClick={openChangeCalendar} disabled={busy} className="h-7 text-xs">
+            <CalendarDays className="h-3 w-3 mr-1" /> Change calendar
+          </Button>
+        )}
         <Button size="sm" variant="outline" onClick={openAcuity} disabled={busy} className="h-7 text-xs">
           <Link2 className="h-3 w-3 mr-1" /> Acuity
         </Button>
@@ -363,6 +425,42 @@ export function LineBookingConfig({
           <DialogFooter>
             <Button variant="ghost" onClick={() => setGoogleOpen(false)} disabled={busy}>Cancel</Button>
             <Button onClick={saveGoogle} disabled={busy || !calendarId}>
+              {busy && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />} Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change calendar dialog (for already-connected Google lines) */}
+      <Dialog open={changeCalOpen} onOpenChange={setChangeCalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Choose calendar for {line.label ?? line.phone_number}</DialogTitle>
+            <DialogDescription>
+              Pick which calendar in the connected Google account this line should use.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {loadingCals ? (
+              <div className="flex items-center text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Loading…
+              </div>
+            ) : (
+              <Select value={calendarId} onValueChange={setCalendarId}>
+                <SelectTrigger><SelectValue placeholder="Choose…" /></SelectTrigger>
+                <SelectContent>
+                  {calendars.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.summary}{c.primary ? " (primary)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setChangeCalOpen(false)} disabled={busy}>Cancel</Button>
+            <Button onClick={saveChangeCalendar} disabled={busy || !calendarId}>
               {busy && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />} Save
             </Button>
           </DialogFooter>
