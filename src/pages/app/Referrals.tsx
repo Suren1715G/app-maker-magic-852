@@ -13,7 +13,8 @@ const TIERS = [
   { count: 1, off: 50, label: "$50 OFF" },
   { count: 2, off: 100, label: "$100 OFF" },
   { count: 3, off: 175, label: "$175 OFF" },
-  { count: 4, off: 250, label: "FREE MONTH" },
+  { count: 4, off: 250, label: "$19/MO" },
+  { count: 5, off: 269, label: "FREE MONTH" },
 ] as const;
 
 function priceFor(count: number) {
@@ -131,10 +132,10 @@ const Referrals = () => {
   const { off: pickedOff, price: pickedPrice } = priceFor(picked);
   const animatedPrice = useCountUp(pickedPrice, 500);
   const animatedSavings = useCountUp(pickedOff, 500);
-  const isMax = picked >= 4;
+  const isMax = picked >= 5;
   const currentDiscount = priceFor(earned).off;
   const currentBill = priceFor(earned).price;
-  const toGoal = Math.max(0, 4 - earned);
+  const toGoal = Math.max(0, 5 - earned);
 
   return (
     <AppShell>
@@ -166,10 +167,10 @@ const Referrals = () => {
             <SectionLabel>YOUR STATUS</SectionLabel>
             <div className="font-display text-6xl md:text-8xl font-bold leading-none mt-2">
               <span className="prism-text">{earned}</span>
-              <span className="text-foreground/70"> / 4</span>
+              <span className="text-foreground/70"> / 5</span>
             </div>
             <div className="text-sm text-muted-foreground mt-4">
-              {earned >= 4
+              {earned >= 5
                 ? "You've maxed out — next month is on us."
                 : `${toGoal} more for a free month.`}
             </div>
@@ -177,7 +178,7 @@ const Referrals = () => {
               <div
                 className="h-full rounded-full transition-all duration-500"
                 style={{
-                  width: `${Math.min(100, (earned / 4) * 100)}%`,
+                  width: `${Math.min(100, (earned / 5) * 100)}%`,
                   background: "var(--gradient-hero)",
                 }}
               />
@@ -226,7 +227,7 @@ const Referrals = () => {
                     <span className="text-xs md:text-sm text-muted-foreground line-through mr-2">${BASE_PRICE}</span>
                     <span className={cn(
                       "font-display font-bold text-2xl md:text-4xl",
-                      t.count === 4 && "prism-text"
+                      t.count === 5 && "prism-text"
                     )}>
                       ${BASE_PRICE - t.off}
                     </span>
@@ -263,7 +264,7 @@ const Referrals = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setPicked((p) => Math.min(4, p + 1))}
+                onClick={() => setPicked((p) => Math.min(5, p + 1))}
                 className="h-12 w-12 rounded-full glass flex items-center justify-center text-2xl text-foreground/70 hover:text-foreground hover:scale-105 transition-all border border-white/10"
                 aria-label="Increase"
               >
@@ -277,12 +278,12 @@ const Referrals = () => {
                 <div
                   className="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
                   style={{
-                    width: `${(picked / 4) * 100}%`,
+                    width: `${(picked / 5) * 100}%`,
                     background: "linear-gradient(90deg, hsl(320 95% 65%), hsl(280 90% 65%), hsl(190 95% 60%))",
                     boxShadow: "0 0 16px hsl(280 90% 65% / 0.6)",
                   }}
                 />
-                {[0, 1, 2, 3, 4].map((dot) => (
+                {[0, 1, 2, 3, 4, 5].map((dot) => (
                   <button
                     key={dot}
                     type="button"
@@ -294,7 +295,7 @@ const Referrals = () => {
                         ? "bg-foreground border-foreground scale-110"
                         : "bg-background border-foreground/40"
                     )}
-                    style={{ left: `${(dot / 4) * 100}%` }}
+                    style={{ left: `${(dot / 5) * 100}%` }}
                   />
                 ))}
               </div>
@@ -416,20 +417,20 @@ const Referrals = () => {
                   PROGRESS TO NEXT TIER
                 </div>
                 <div className="font-mono text-[11px] text-foreground/80">
-                  {earned} / 4
+                {earned} / 5
                 </div>
               </div>
               <div className="h-2 rounded-full bg-secondary/60 overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{
-                    width: `${Math.min(100, (earned / 4) * 100)}%`,
+                    width: `${Math.min(100, (earned / 5) * 100)}%`,
                     background: "var(--gradient-hero)",
                   }}
                 />
               </div>
               <div className="text-xs text-muted-foreground mt-2">
-                {earned >= 4 ? "You've maxed out — enjoy your free month." : `${toGoal} more for a free month.`}
+                {earned >= 5 ? "You've maxed out — enjoy your free month." : `${toGoal} more for a free month.`}
               </div>
             </div>
           </div>
