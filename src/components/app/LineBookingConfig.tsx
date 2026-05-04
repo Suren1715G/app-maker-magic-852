@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getFreshAccessToken } from "@/lib/authSession";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -305,9 +306,7 @@ export function LineBookingConfig({
   const connectNewGoogleForLine = async () => {
     setBusy(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) throw new Error("Not signed in");
+      const token = await getFreshAccessToken();
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-google-oauth-start`;
       const res = await fetch(url, {
         method: "POST",
@@ -323,7 +322,7 @@ export function LineBookingConfig({
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Failed");
+      if (!res.ok) throw new Error(json.error === "Not authenticated" ? "Your login expired. Please sign in again." : json.error ?? "Failed");
       window.location.href = json.url;
     } catch (e: any) {
       toast.error(e.message ?? "Failed to start Google OAuth");
