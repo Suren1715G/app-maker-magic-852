@@ -1,6 +1,15 @@
 // Unified booking tool for the AI receptionist.
-// Routes check_availability + book_appointment to the company's configured
-// booking provider: Google Calendar, Calendly, or Acuity Scheduling.
+//
+// Routing is STRICT PER-LINE: every request must resolve to a specific
+// phone line (location). The booking goes to that line's configured
+// calendar (Google or Acuity). If the line has no booking integration
+// set up, the call fails with `not_configured_for_this_line` — there is
+// NO company-level fallback.
+//
+// The line is resolved from (in priority order):
+//   1. body.line_id              (uuid of company_phone_numbers.id)
+//   2. body.to_number            (the number the customer dialed)
+//   3. body.call_id              (look up calls.to_number, then resolve)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -23,6 +32,82 @@ function normalizePhone(p?: string | null) {
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
   if (p.startsWith("+")) return p;
   return digits ? `+${digits}` : null;
+}
+
+type LineConfig = {
+  line_id: string;
+  company_id: string;
+  provider: "none" | "google" | "acuity";
+  calendar_id: string | null;
+  calendar_summary: string | null;
+  owner_user_id: string | null;
+  access_token: string | null;
+  refresh_token: string | null;
+  expires_at: string | null;
+  acuity_user_id: string | null;
+  acuity_api_key: string | null;
+  acuity_appointment_type_id: string | null;
+  acuity_scheduling_url: string | null;
+  business_hours_timezone: string | null;
+};
+
+async function resolveLine(
+  admin: any,
+  company_id: string,
+  body: any,
+): Promise<{ ok: true; line: LineConfig } | { ok: false; error: string; status?: number }> {
+  let line_id: string | null = body?.line_id ? String(body.line_id) : null;
+
+  // 2. to_number → line_id
+  if (!line_id && body?.to_number) {
+    const to = normalizePhone(String(body.to_number));
+    if (to) {
+      const { data } = await admin
+        .from("company_phone_numbers")
+        .select("id")
+        .eq("company_id", company_id)
+        .eq("phone_number", to)
+        .maybeSingle();
+      if (data?.id) line_id = data.id;
+    }
+  }
+
+  // 3. call_id → calls.to_number → line_id
+  if (!line_id && body?.call_id) {
+    const { data: call } = await admin
+      .from("calls")
+      .select("to_number")
+      .eq("id", String(body.call_id))
+      .eq("company_id", company_id)
+      .maybeSingle();
+    if (call?.to_number) {
+      const { data: pn } = await admin
+        .from("company_phone_numbers")
+        .select("id")
+        .eq("company_id", company_id)
+        .eq("phone_number", call.to_number)
+        .maybeSingle();
+      if (pn?.id) line_id = pn.id;
+    }
+  }
+
+  if (!line_id) {
+    return {
+      ok: false,
+      error:
+        "Could not determine which phone line this booking is for. Pass line_id, to_number (the number that was dialed), or call_id.",
+      status: 400,
+    };
+  }
+
+  const { data: rows, error } = await admin.rpc("get_line_booking_config", { _line_id: line_id });
+  if (error) return { ok: false, error: error.message, status: 500 };
+  const line = Array.isArray(rows) && rows.length > 0 ? (rows[0] as LineConfig) : null;
+  if (!line) return { ok: false, error: "Line not found", status: 404 };
+  if (line.company_id !== company_id) {
+    return { ok: false, error: "Line does not belong to this company", status: 403 };
+  }
+  return { ok: true, line };
 }
 
 // ---------- Google ----------
@@ -55,22 +140,18 @@ async function googleRefresh(admin: any, row: any) {
 
 async function googleCheckAvailability(
   admin: any,
-  company: any,
+  line: LineConfig,
   startISO: string,
   endISO: string,
 ) {
-  const { data: rows } = await admin.rpc("get_company_calendar_connection", {
-    _company_id: company.id,
-  });
-  const conn = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
-  if (!conn?.access_token || !conn?.calendar_id) {
-    return { ok: false, error: "Google Calendar not connected for this company." };
+  if (!line.access_token || !line.calendar_id || !line.owner_user_id) {
+    return { ok: false, error: "Google Calendar not connected for this line." };
   }
   const tokenRow = {
-    user_id: conn.owner_user_id,
-    access_token: conn.access_token,
-    refresh_token: conn.refresh_token,
-    expires_at: conn.expires_at,
+    user_id: line.owner_user_id,
+    access_token: line.access_token,
+    refresh_token: line.refresh_token,
+    expires_at: line.expires_at,
   };
   const accessToken = await googleRefresh(admin, tokenRow);
   const res = await fetch("https://www.googleapis.com/calendar/v3/freeBusy", {
@@ -79,18 +160,18 @@ async function googleCheckAvailability(
     body: JSON.stringify({
       timeMin: startISO,
       timeMax: endISO,
-      items: [{ id: conn.calendar_id }],
+      items: [{ id: line.calendar_id }],
     }),
   });
   const data = await res.json();
   if (!res.ok) return { ok: false, error: `Google freeBusy failed: ${JSON.stringify(data)}` };
-  const busy = data?.calendars?.[conn.calendar_id]?.busy ?? [];
+  const busy = data?.calendars?.[line.calendar_id]?.busy ?? [];
   return { ok: true, provider: "google", busy };
 }
 
 async function googleBook(
   admin: any,
-  company: any,
+  line: LineConfig,
   args: {
     startISO: string;
     endISO: string;
@@ -101,22 +182,18 @@ async function googleBook(
     customer_phone?: string;
   },
 ) {
-  const { data: rows } = await admin.rpc("get_company_calendar_connection", {
-    _company_id: company.id,
-  });
-  const conn = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
-  if (!conn?.access_token || !conn?.calendar_id) {
-    return { ok: false, error: "Google Calendar not connected for this company." };
+  if (!line.access_token || !line.calendar_id || !line.owner_user_id) {
+    return { ok: false, error: "Google Calendar not connected for this line." };
   }
   const tokenRow = {
-    user_id: conn.owner_user_id,
-    access_token: conn.access_token,
-    refresh_token: conn.refresh_token,
-    expires_at: conn.expires_at,
+    user_id: line.owner_user_id,
+    access_token: line.access_token,
+    refresh_token: line.refresh_token,
+    expires_at: line.expires_at,
   };
   const accessToken = await googleRefresh(admin, tokenRow);
 
-  const tz = company.business_hours_timezone || "America/New_York";
+  const tz = line.business_hours_timezone || "America/New_York";
   const descriptionLines = [
     args.description ?? "",
     args.customer_name ? `Customer: ${args.customer_name}` : "",
@@ -136,7 +213,7 @@ async function googleBook(
   }
 
   const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(conn.calendar_id)}/events`,
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(line.calendar_id)}/events`,
     {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
@@ -153,93 +230,24 @@ async function googleBook(
   };
 }
 
-// ---------- Calendly ----------
-async function calendlyCheckAvailability(company: any, startISO: string, endISO: string) {
-  if (!company.calendly_access_token || !company.calendly_event_type_uri) {
-    return { ok: false, error: "Calendly not configured." };
-  }
-  const params = new URLSearchParams({
-    event_type: company.calendly_event_type_uri,
-    start_time: startISO,
-    end_time: endISO,
-  });
-  const res = await fetch(`https://api.calendly.com/event_type_available_times?${params}`, {
-    headers: { Authorization: `Bearer ${company.calendly_access_token}` },
-  });
-  const data = await res.json();
-  if (!res.ok) return { ok: false, error: `Calendly error: ${JSON.stringify(data)}` };
-  const slots = (data?.collection ?? []).map((s: any) => ({
-    start_time: s.start_time,
-    scheduling_url: s.scheduling_url,
-  }));
-  return { ok: true, provider: "calendly", slots };
-}
-
-async function calendlyBook(company: any, args: {
-  startISO: string;
-  customer_name?: string;
-  customer_email?: string;
-  customer_phone?: string;
-}) {
-  // Calendly's API does NOT allow creating bookings directly from a PAT.
-  // Instead, we look up the available slot at startISO and return its
-  // scheduling_url, then the AI texts the link to the customer.
-  if (!company.calendly_access_token || !company.calendly_event_type_uri) {
-    return { ok: false, error: "Calendly not configured." };
-  }
-  const start = new Date(args.startISO);
-  const dayStart = new Date(start); dayStart.setUTCHours(0, 0, 0, 0);
-  const dayEnd = new Date(start); dayEnd.setUTCHours(23, 59, 59, 999);
-  const params = new URLSearchParams({
-    event_type: company.calendly_event_type_uri,
-    start_time: dayStart.toISOString(),
-    end_time: dayEnd.toISOString(),
-  });
-  const res = await fetch(`https://api.calendly.com/event_type_available_times?${params}`, {
-    headers: { Authorization: `Bearer ${company.calendly_access_token}` },
-  });
-  const data = await res.json();
-  if (!res.ok) return { ok: false, error: `Calendly lookup failed: ${JSON.stringify(data)}` };
-  const slot = (data?.collection ?? []).find(
-    (s: any) => Math.abs(new Date(s.start_time).getTime() - start.getTime()) < 60_000,
-  );
-  if (!slot) {
-    return {
-      ok: false,
-      error: "That exact time is no longer available on Calendly.",
-      scheduling_url: company.calendly_scheduling_url ?? null,
-    };
-  }
-  return {
-    ok: true,
-    provider: "calendly",
-    requires_customer_to_finalize: true,
-    scheduling_url: slot.scheduling_url,
-    instructions:
-      "Calendly requires the customer to finalize the booking themselves. Send them this link via SMS to confirm.",
-  };
-}
-
 // ---------- Acuity ----------
-function acuityAuthHeader(company: any) {
-  const creds = `${company.acuity_user_id}:${company.acuity_api_key}`;
-  // base64
-  const b64 = btoa(creds);
-  return `Basic ${b64}`;
+function acuityAuthHeader(line: LineConfig) {
+  const creds = `${line.acuity_user_id}:${line.acuity_api_key}`;
+  return `Basic ${btoa(creds)}`;
 }
 
-async function acuityCheckAvailability(company: any, startISO: string) {
-  if (!company.acuity_user_id || !company.acuity_api_key || !company.acuity_appointment_type_id) {
-    return { ok: false, error: "Acuity not configured." };
+async function acuityCheckAvailability(line: LineConfig, startISO: string) {
+  if (!line.acuity_user_id || !line.acuity_api_key || !line.acuity_appointment_type_id) {
+    return { ok: false, error: "Acuity not configured for this line." };
   }
   const date = startISO.slice(0, 10); // YYYY-MM-DD
   const params = new URLSearchParams({
-    appointmentTypeID: company.acuity_appointment_type_id,
+    appointmentTypeID: line.acuity_appointment_type_id,
     date,
   });
   const res = await fetch(
     `https://acuityscheduling.com/api/v1/availability/times?${params}`,
-    { headers: { Authorization: acuityAuthHeader(company) } },
+    { headers: { Authorization: acuityAuthHeader(line) } },
   );
   const data = await res.json();
   if (!res.ok) return { ok: false, error: `Acuity error: ${JSON.stringify(data)}` };
@@ -247,14 +255,14 @@ async function acuityCheckAvailability(company: any, startISO: string) {
   return { ok: true, provider: "acuity", slots };
 }
 
-async function acuityBook(company: any, args: {
+async function acuityBook(line: LineConfig, args: {
   startISO: string;
   customer_name?: string;
   customer_email?: string;
   customer_phone?: string;
 }) {
-  if (!company.acuity_user_id || !company.acuity_api_key || !company.acuity_appointment_type_id) {
-    return { ok: false, error: "Acuity not configured." };
+  if (!line.acuity_user_id || !line.acuity_api_key || !line.acuity_appointment_type_id) {
+    return { ok: false, error: "Acuity not configured for this line." };
   }
   if (!args.customer_email) {
     return { ok: false, error: "Acuity requires a customer email to book." };
@@ -263,7 +271,7 @@ async function acuityBook(company: any, args: {
   const lastName = rest.join(" ") || "—";
   const payload = {
     datetime: args.startISO,
-    appointmentTypeID: Number(company.acuity_appointment_type_id),
+    appointmentTypeID: Number(line.acuity_appointment_type_id),
     firstName,
     lastName,
     email: args.customer_email,
@@ -272,7 +280,7 @@ async function acuityBook(company: any, args: {
   const res = await fetch("https://acuityscheduling.com/api/v1/appointments", {
     method: "POST",
     headers: {
-      Authorization: acuityAuthHeader(company),
+      Authorization: acuityAuthHeader(line),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
@@ -310,31 +318,44 @@ Deno.serve(async (req) => {
 
     const { data: company } = await admin
       .from("companies")
-      .select("*")
+      .select("id")
       .eq("id", company_id)
       .maybeSingle();
     if (!company) return json({ error: "Unknown company" }, 404);
 
-    const provider = company.booking_provider || "google";
+    const resolved = await resolveLine(admin, company_id, body);
+    if (!resolved.ok) return json({ ok: false, error: resolved.error }, resolved.status ?? 400);
+    const line = resolved.line;
+    const provider = line.provider;
 
     if (action === "get_provider") {
+      const configured =
+        provider === "google"
+          ? Boolean(line.calendar_id && line.owner_user_id && line.access_token)
+          : provider === "acuity"
+            ? Boolean(line.acuity_user_id && line.acuity_api_key && line.acuity_appointment_type_id)
+            : false;
       return json({
         provider,
-        configured:
-          provider === "google"
-            ? Boolean(company.shared_calendar_id && company.shared_calendar_owner_user_id)
-            : provider === "calendly"
-              ? Boolean(company.calendly_access_token && company.calendly_event_type_uri)
-              : provider === "acuity"
-                ? Boolean(company.acuity_user_id && company.acuity_api_key && company.acuity_appointment_type_id)
-                : false,
-        scheduling_url:
-          provider === "calendly"
-            ? company.calendly_scheduling_url
-            : provider === "acuity"
-              ? company.acuity_scheduling_url
-              : null,
+        configured,
+        line_id: line.line_id,
+        calendar_summary: provider === "google" ? line.calendar_summary : null,
+        scheduling_url: provider === "acuity" ? line.acuity_scheduling_url : null,
+        error: provider === "none"
+          ? "This phone line has no booking integration set up. Configure it in Settings → Locations."
+          : !configured
+            ? `This phone line is set to ${provider} but is missing credentials.`
+            : undefined,
       });
+    }
+
+    if (provider === "none") {
+      return json({
+        ok: false,
+        error: "not_configured_for_this_line",
+        message:
+          "This phone line has no booking integration set up. The owner needs to connect a calendar in Settings → Locations.",
+      }, 200);
     }
 
     if (action === "check_availability") {
@@ -342,10 +363,8 @@ Deno.serve(async (req) => {
       const endISO = String(body?.end_time ?? "").trim();
       if (!startISO) return json({ error: "start_time (ISO 8601) is required" }, 400);
       const computedEnd = endISO || new Date(new Date(startISO).getTime() + 60 * 60 * 1000).toISOString();
-
-      if (provider === "google") return json(await googleCheckAvailability(admin, company, startISO, computedEnd));
-      if (provider === "calendly") return json(await calendlyCheckAvailability(company, startISO, computedEnd));
-      if (provider === "acuity") return json(await acuityCheckAvailability(company, startISO));
+      if (provider === "google") return json(await googleCheckAvailability(admin, line, startISO, computedEnd));
+      if (provider === "acuity") return json(await acuityCheckAvailability(line, startISO));
       return json({ ok: false, error: `Unknown provider: ${provider}` }, 400);
     }
 
@@ -364,7 +383,7 @@ Deno.serve(async (req) => {
 
       if (!confirmed) {
         return json({
-          preview: `Book "${summary}" on ${startISO} for ${durationMin} min via ${provider}` +
+          preview: `Book "${summary}" on ${startISO} for ${durationMin} min via ${provider} (line ${line.line_id})` +
             (customer_name ? ` for ${customer_name}` : "") +
             (customer_phone ? ` (${customer_phone})` : "") + ".",
           requires_confirmation: true,
@@ -373,17 +392,12 @@ Deno.serve(async (req) => {
       }
 
       if (provider === "google") {
-        return json(await googleBook(admin, company, {
+        return json(await googleBook(admin, line, {
           startISO, endISO, summary, description, customer_name, customer_email, customer_phone,
         }));
       }
-      if (provider === "calendly") {
-        return json(await calendlyBook(company, {
-          startISO, customer_name, customer_email, customer_phone,
-        }));
-      }
       if (provider === "acuity") {
-        return json(await acuityBook(company, {
+        return json(await acuityBook(line, {
           startISO, customer_name, customer_email, customer_phone,
         }));
       }

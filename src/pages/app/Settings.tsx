@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getStoredTheme, setTheme } from "@/lib/theme";
+import { LineBookingConfig } from "@/components/app/LineBookingConfig";
 
 const VOICE_OPTIONS: { id: string; label: string }[] = [
   { id: "wDsJlOXPqcvIUKdLXjDs", label: "Jarvis · British robotic monotone" },
@@ -70,6 +71,11 @@ const Settings = () => {
     phone_number: string;
     status: "pending" | "active" | "disabled";
     created_at: string;
+    booking_provider: "none" | "google" | "acuity";
+    shared_calendar_id: string | null;
+    shared_calendar_summary: string | null;
+    shared_calendar_owner_user_id: string | null;
+    acuity_appointment_type_id: string | null;
   };
   const [locations, setLocations] = useState<LocationRow[]>([]);
 
@@ -356,7 +362,7 @@ const Settings = () => {
   const loadLocations = async (cid: string) => {
     const { data } = await supabase
       .from("company_phone_numbers")
-      .select("id, label, phone_number, status, created_at")
+      .select("id, label, phone_number, status, created_at, booking_provider, shared_calendar_id, shared_calendar_summary, shared_calendar_owner_user_id, acuity_appointment_type_id")
       .eq("company_id", cid)
       .order("created_at", { ascending: true });
     const rows = (data ?? []) as LocationRow[];
@@ -519,17 +525,26 @@ const Settings = () => {
                     : "bg-muted text-muted-foreground";
               const Icon = l.status === "pending" ? Clock : MapPin;
               return (
-                <li key={l.id} className="py-3 flex items-center gap-3">
-                  <span className="h-9 w-9 rounded-full bg-card border border-border flex items-center justify-center shrink-0">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{l.label ?? "Untitled location"}</div>
-                    <div className="text-[11px] text-muted-foreground truncate">{l.phone_number}</div>
+                <li key={l.id} className="py-3 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className="h-9 w-9 rounded-full bg-card border border-border flex items-center justify-center shrink-0">
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{l.label ?? "Untitled location"}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">{l.phone_number}</div>
+                    </div>
+                    <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${tone}`}>
+                      {l.status}
+                    </span>
                   </div>
-                  <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${tone}`}>
-                    {l.status}
-                  </span>
+                  {l.status === "active" && companyId && (
+                    <LineBookingConfig
+                      line={l}
+                      companyId={companyId}
+                      onChanged={() => loadLocations(companyId)}
+                    />
+                  )}
                 </li>
               );
             })}

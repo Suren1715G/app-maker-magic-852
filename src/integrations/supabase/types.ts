@@ -247,6 +247,8 @@ export type Database = {
       }
       company_phone_numbers: {
         Row: {
+          acuity_appointment_type_id: string | null
+          booking_provider: string
           company_id: string
           created_at: string
           id: string
@@ -254,10 +256,15 @@ export type Database = {
           phone_number: string
           provider: string
           requested_by: string | null
+          shared_calendar_id: string | null
+          shared_calendar_owner_user_id: string | null
+          shared_calendar_summary: string | null
           status: string
           updated_at: string
         }
         Insert: {
+          acuity_appointment_type_id?: string | null
+          booking_provider?: string
           company_id: string
           created_at?: string
           id?: string
@@ -265,10 +272,15 @@ export type Database = {
           phone_number: string
           provider?: string
           requested_by?: string | null
+          shared_calendar_id?: string | null
+          shared_calendar_owner_user_id?: string | null
+          shared_calendar_summary?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
+          acuity_appointment_type_id?: string | null
+          booking_provider?: string
           company_id?: string
           created_at?: string
           id?: string
@@ -276,6 +288,9 @@ export type Database = {
           phone_number?: string
           provider?: string
           requested_by?: string | null
+          shared_calendar_id?: string | null
+          shared_calendar_owner_user_id?: string | null
+          shared_calendar_summary?: string | null
           status?: string
           updated_at?: string
         }
@@ -897,8 +912,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _assert_company_owns_line: { Args: { _line_id: string }; Returns: string }
       admin_clear_company_booking: {
         Args: { _company_id: string }
+        Returns: undefined
+      }
+      admin_clear_line_booking: {
+        Args: { _line_id: string }
         Returns: undefined
       }
       admin_save_company_google_tokens: {
@@ -934,14 +954,44 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_set_line_acuity: {
+        Args: { _appointment_type_id: string; _line_id: string }
+        Returns: undefined
+      }
+      admin_set_line_google: {
+        Args: {
+          _calendar_id: string
+          _calendar_summary: string
+          _line_id: string
+          _owner_user_id: string
+        }
+        Returns: undefined
+      }
       claim_access_code: { Args: { _code: string }; Returns: string }
       company_clear_booking: { Args: never; Returns: undefined }
+      company_clear_line_booking: {
+        Args: { _line_id: string }
+        Returns: undefined
+      }
       company_set_acuity: {
         Args: {
           _api_key: string
           _appointment_type_id: string
           _scheduling_url: string
           _user_id: string
+        }
+        Returns: undefined
+      }
+      company_set_line_acuity: {
+        Args: { _appointment_type_id: string; _line_id: string }
+        Returns: undefined
+      }
+      company_set_line_google: {
+        Args: {
+          _calendar_id: string
+          _calendar_summary: string
+          _line_id: string
+          _owner_user_id: string
         }
         Returns: undefined
       }
@@ -955,6 +1005,26 @@ export type Database = {
           expires_at: string
           owner_email: string
           owner_user_id: string
+          refresh_token: string
+        }[]
+      }
+      get_line_booking_config: {
+        Args: { _line_id: string }
+        Returns: {
+          access_token: string
+          acuity_api_key: string
+          acuity_appointment_type_id: string
+          acuity_scheduling_url: string
+          acuity_user_id: string
+          business_hours_timezone: string
+          calendar_id: string
+          calendar_summary: string
+          company_id: string
+          expires_at: string
+          line_id: string
+          owner_email: string
+          owner_user_id: string
+          provider: string
           refresh_token: string
         }[]
       }
