@@ -351,7 +351,7 @@ export function LineBookingConfig({
         </Button>
         {provider === "google" && (
           <Button size="sm" variant="outline" onClick={openChangeCalendar} disabled={busy} className="h-7 text-xs">
-            <CalendarDays className="h-3 w-3 mr-1" /> Change calendar
+            <CalendarDays className="h-3 w-3 mr-1" /> Pick sub-calendar
           </Button>
         )}
         <Button size="sm" variant="outline" onClick={openAcuity} disabled={busy} className="h-7 text-xs">
