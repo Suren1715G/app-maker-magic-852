@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { CompanyBookingIntegration } from "@/components/master/CompanyBookingIntegration";
 import { CompanyAgentControls } from "@/components/master/CompanyAgentControls";
+import { LineBookingConfig } from "@/components/app/LineBookingConfig";
 type Detail = {
   id: string;
   name: string;
@@ -46,6 +47,11 @@ type PhoneRow = {
   phone_number: string;
   status: "pending" | "active" | "disabled";
   created_at: string;
+  booking_provider: "none" | "google" | "acuity";
+  shared_calendar_id: string | null;
+  shared_calendar_summary: string | null;
+  shared_calendar_owner_user_id: string | null;
+  acuity_appointment_type_id: string | null;
 };
 
 type LocReqRow = {
@@ -89,7 +95,7 @@ const MasterCompanyDetail = () => {
   const loadPhones = async (cid: string) => {
     const { data } = await supabase
       .from("company_phone_numbers")
-      .select("id, label, phone_number, status, created_at")
+      .select("id, label, phone_number, status, created_at, booking_provider, shared_calendar_id, shared_calendar_summary, shared_calendar_owner_user_id, acuity_appointment_type_id")
       .eq("company_id", cid)
       .order("created_at", { ascending: true });
     setPhones((data ?? []) as PhoneRow[]);
@@ -256,37 +262,33 @@ const MasterCompanyDetail = () => {
                         ? "bg-primary/15 text-primary"
                         : "bg-muted text-muted-foreground";
                   return (
-                    <li key={p.id} className="flex items-center gap-2 text-sm">
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate font-medium">{p.label ?? "Untitled"}</div>
-                        <div className="text-[11px] text-muted-foreground truncate">{p.phone_number}</div>
+                    <li key={p.id} className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate font-medium">{p.label ?? "Untitled"}</div>
+                          <div className="text-[11px] text-muted-foreground truncate">{p.phone_number}</div>
+                        </div>
+                        <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full shrink-0 ${tone}`}>
+                          {p.status}
+                        </span>
+                        {p.status !== "active" && (
+                          <button onClick={() => setStatus(p.id, "active")} className="text-[10px] text-success hover:underline">Activate</button>
+                        )}
+                        {p.status === "active" && (
+                          <button onClick={() => setStatus(p.id, "disabled")} className="text-[10px] text-muted-foreground hover:underline">Disable</button>
+                        )}
+                        <button onClick={() => adminDeletePhone(p.id)} className="text-muted-foreground hover:text-destructive" aria-label="Delete">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
-                      <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full shrink-0 ${tone}`}>
-                        {p.status}
-                      </span>
-                      {p.status !== "active" && (
-                        <button
-                          onClick={() => setStatus(p.id, "active")}
-                          className="text-[10px] text-success hover:underline"
-                        >
-                          Activate
-                        </button>
+                      {p.status === "active" && data && (
+                        <LineBookingConfig
+                          line={p}
+                          companyId={data.id}
+                          admin
+                          onChanged={() => loadPhones(data.id)}
+                        />
                       )}
-                      {p.status === "active" && (
-                        <button
-                          onClick={() => setStatus(p.id, "disabled")}
-                          className="text-[10px] text-muted-foreground hover:underline"
-                        >
-                          Disable
-                        </button>
-                      )}
-                      <button
-                        onClick={() => adminDeletePhone(p.id)}
-                        className="text-muted-foreground hover:text-destructive"
-                        aria-label="Delete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
                     </li>
                   );
                 })}
