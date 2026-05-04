@@ -27,6 +27,7 @@ import Referrals from "./pages/app/Referrals";
 import Support from "./pages/app/Support";
 import Assistant from "./pages/app/Assistant";
 import Notes from "./pages/app/Notes";
+import Privacy from "./pages/Privacy";
 import MasterOverview from "./pages/master/MasterOverview";
 import MasterCompanies from "./pages/master/MasterCompanies";
 import MasterCompanyDetail from "./pages/master/MasterCompanyDetail";
@@ -63,6 +64,7 @@ const App = () => (
                 <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/claim" element={<ClaimCode />} />
+              <Route path="/privacy" element={<Privacy />} />
 
               {/* Owner master panel */}
               <Route path="/master" element={<AdminRoute><MasterOverview /></AdminRoute>} />
