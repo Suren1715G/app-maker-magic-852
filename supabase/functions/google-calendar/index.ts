@@ -88,6 +88,28 @@ async function fetchCalendarList(accessToken: string, minAccessRole?: string) {
   return { ok: true as const, items };
 }
 
+function googleApiMessage(data: any) {
+  return data?.error?.message ?? data?.error?.error?.message ?? data?.message ?? null;
+}
+
+function calendarListErrorResponse(list: any) {
+  const googleMessage = googleApiMessage(list.data);
+  const needsReconnect =
+    list.status === 401 ||
+    list.status === 403 ||
+    /insufficient authentication scopes|invalid_grant|unauthorized|forbidden/i.test(googleMessage ?? "");
+
+  if (needsReconnect) {
+    return json({
+      error: "reconnect_required",
+      message:
+        "Google needs to be reconnected for this line so calendar permissions can be refreshed.",
+    });
+  }
+
+  return json({ error: "google_calendar_error", message: googleMessage ?? "Failed to load calendars" }, list.status);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -177,7 +199,7 @@ Deno.serve(async (req) => {
       if (!row) return json({ error: "not_connected" }, 400);
       const accessToken = await refreshIfNeeded(admin, row);
       const list = await fetchCalendarList(accessToken);
-      if (!list.ok) return json({ error: list.data }, list.status);
+      if (!list.ok) return calendarListErrorResponse(list);
       const items = list.items.map((c: any) => ({
         id: c.id,
         summary: c.summary,
@@ -221,7 +243,7 @@ Deno.serve(async (req) => {
 
       const accessToken = await refreshIfNeeded(admin, ownerRow);
       const list = await fetchCalendarList(accessToken);
-      if (!list.ok) return json({ error: list.data }, list.status);
+      if (!list.ok) return calendarListErrorResponse(list);
       const items = list.items.map((c: any) => ({
         id: c.id,
         summary: c.summary,
@@ -358,7 +380,6 @@ Deno.serve(async (req) => {
           message:
             "Google connection expired or was revoked. Please reconnect the Google account for this line.",
         },
-        401,
       );
     }
     return json({ error: msg }, 500);
