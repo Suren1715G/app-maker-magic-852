@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
       if (!row) return json({ error: "not_connected" }, 400);
       const accessToken = await refreshIfNeeded(admin, row);
       const res = await fetch(
-        "https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=writer&maxResults=250",
+        "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250",
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       const data = await res.json();
@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
 
       const accessToken = await refreshIfNeeded(admin, ownerRow);
       const res = await fetch(
-        "https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=writer&maxResults=250",
+        "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250",
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       const data = await res.json();
