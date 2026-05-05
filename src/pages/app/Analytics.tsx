@@ -53,14 +53,22 @@ const Analytics = () => {
     if (!isNew) {
       return { weeklySeries: mockWeeklySeries, heatmap: mockHeatmap, stats: mockStats };
     }
-    // Build last-7-day series ending today (always 7 buckets for the chart)
-    const now = new Date();
+    // Build a daily series spanning the selected range (7d, 30d, or MTD).
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(rangeStart);
+    const dayMs = 24 * 60 * 60 * 1000;
+    const numDays = Math.max(1, Math.round((today.getTime() - start.getTime()) / dayMs) + 1);
     const days: { day: string; date: Date; calls: number; bookings: number; revenue: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
+    for (let i = 0; i < numDays; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
       d.setHours(0, 0, 0, 0);
-      days.push({ day: dayLabels[d.getDay()], date: d, calls: 0, bookings: 0, revenue: 0 });
+      // For longer ranges, show date label (e.g. "5/3") instead of weekday
+      const label = numDays <= 7
+        ? dayLabels[d.getDay()]
+        : `${d.getMonth() + 1}/${d.getDate()}`;
+      days.push({ day: label, date: d, calls: 0, bookings: 0, revenue: 0 });
     }
     const heat = dayLabels.map((d) => ({ day: d, hours: Array(24).fill(0) as number[] }));
     let totalSec = 0;
@@ -69,7 +77,7 @@ const Analytics = () => {
       totalSec += c.duration_sec ?? 0;
       // heatmap by weekday/hour
       heat[t.getDay()].hours[t.getHours()] += 1;
-      // weekly series
+      // daily series
       for (const bucket of days) {
         const next = new Date(bucket.date); next.setDate(next.getDate() + 1);
         if (t >= bucket.date && t < next) {
@@ -84,7 +92,7 @@ const Analytics = () => {
       heatmap: heat,
       stats: { ...mockStats, minutesSaved: Math.round(totalSec / 60) },
     };
-  }, [isNew, realCalls]);
+  }, [isNew, realCalls, rangeStart]);
 
   const totalCalls = weeklySeries.reduce((a, b) => a + b.calls, 0);
   const totalBookings = weeklySeries.reduce((a, b) => a + b.bookings, 0);
@@ -92,6 +100,7 @@ const Analytics = () => {
   const conv = totalCalls > 0 ? Math.round((totalBookings / totalCalls) * 100) : 0;
 
   const exportPdf = () => {
+    const rangeLabel = range === "7d" ? "Last 7 days" : range === "30d" ? "Last 30 days" : "Month to date";
     const w = window.open("", "_blank");
     if (!w) return;
     w.document.write(`
@@ -108,7 +117,7 @@ const Analytics = () => {
         th,td{text-align:left;padding:8px;border-bottom:1px solid #eee;font-size:12px}
       </style></head><body>
         <h1>SGS Performance Report</h1>
-        <div class="sub">${new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"})} · Last 7 days</div>
+        <div class="sub">${new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"})} · ${rangeLabel}</div>
         <div class="grid">
           <div class="card"><div class="l">Total calls</div><div class="v">${totalCalls}</div></div>
           <div class="card"><div class="l">Bookings</div><div class="v">${totalBookings}</div></div>
