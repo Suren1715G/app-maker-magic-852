@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,6 +21,7 @@ const GoogleIcon = () => (
 const Auth = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,6 +30,11 @@ const Auth = () => {
   const [accessCode, setAccessCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  const getNextPath = () => {
+    const next = new URLSearchParams(location.search).get("next");
+    return next?.startsWith("/") && !next.startsWith("//") ? next : "/";
+  };
 
   // Cleanup any stray hash if redirected back
   useEffect(() => {
@@ -58,7 +64,7 @@ const Auth = () => {
     );
   }
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={getNextPath()} replace />;
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,12 +92,12 @@ const Auth = () => {
         if (error) throw error;
         try { sessionStorage.removeItem("pending_referral_code"); } catch {}
         toast.success("Account created — you're signed in.");
-        navigate("/", { replace: true });
+        navigate(getNextPath(), { replace: true });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Welcome back.");
-        navigate("/", { replace: true });
+        navigate(getNextPath(), { replace: true });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong.";
@@ -105,7 +111,7 @@ const Auth = () => {
     setGoogleLoading(true);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}${getNextPath()}`,
       });
       if (result.error) {
         toast.error(result.error.message || "Google sign-in failed.");
@@ -113,7 +119,7 @@ const Auth = () => {
         return;
       }
       if (result.redirected) return; // browser navigates away
-      navigate("/", { replace: true });
+      navigate(getNextPath(), { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Google sign-in failed.");
       setGoogleLoading(false);
