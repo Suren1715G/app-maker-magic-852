@@ -20,7 +20,7 @@ const Analytics = () => {
   const isNew = useIsNewCustomer();
   const { companyId } = useAuth();
   const [range, setRange] = useState<(typeof ranges)[number]["id"]>("7d");
-  const [realCalls, setRealCalls] = useState<{ started_at: string; duration_sec: number | null; status?: string | null }[]>([]);
+  const [realCalls, setRealCalls] = useState<{ started_at: string; duration_sec: number | null; status?: string | null; metadata?: any }[]>([]);
 
   const rangeStart = useMemo(() => {
     const d = new Date();
