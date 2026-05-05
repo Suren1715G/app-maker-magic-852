@@ -61,7 +61,11 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (pErr) throw new Error(pErr.message);
     if (!pending) throw new Error("Unknown or expired admin OAuth flow");
-    if (pending.consumed_at) throw new Error("OAuth flow already used");
+    if (pending.consumed_at) {
+      // Browser prefetch / double-fire of the callback URL. The first call
+      // already saved tokens — show success instead of an error.
+      return redirectResponse(returnTo, "success", "Connected");
+    }
     if (new Date(pending.expires_at).getTime() < Date.now()) {
       throw new Error("OAuth flow expired, please retry");
     }
@@ -81,7 +85,14 @@ Deno.serve(async (req) => {
       }),
     });
     const tokenJson = await tokenRes.json();
-    if (!tokenRes.ok) throw new Error(`Token exchange failed: ${JSON.stringify(tokenJson)}`);
+    if (!tokenRes.ok) {
+      // If the code was already consumed by a duplicate request and we have
+      // tokens stored from the first call, treat as success.
+      if (tokenJson?.error === "invalid_grant") {
+        return redirectResponse(returnTo, "success", "Connected");
+      }
+      throw new Error(`Token exchange failed: ${JSON.stringify(tokenJson)}`);
+    }
 
     const accessToken: string = tokenJson.access_token;
     const refreshToken: string | undefined = tokenJson.refresh_token;
