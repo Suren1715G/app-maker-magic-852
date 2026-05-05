@@ -37,7 +37,7 @@ const Analytics = () => {
     (async () => {
       const { data } = await supabase
         .from("calls")
-        .select("started_at,duration_sec,status")
+        .select("started_at,duration_sec,status,metadata")
         .eq("company_id", companyId)
         .gte("started_at", rangeStart.toISOString())
         .order("started_at", { ascending: true })
@@ -83,6 +83,13 @@ const Analytics = () => {
         if (t >= bucket.date && t < next) {
           bucket.calls += 1;
           if (c.status === "booked") bucket.bookings += 1;
+          const meta: any = c.metadata ?? {};
+          const v = meta?.classification?.estimated_value
+            ?? meta?.elevenlabs?.classification?.estimated_value
+            ?? 0;
+          if (c.status === "booked" && typeof v === "number" && isFinite(v)) {
+            bucket.revenue += v;
+          }
           break;
         }
       }
