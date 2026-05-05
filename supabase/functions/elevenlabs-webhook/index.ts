@@ -16,7 +16,11 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-type Classification = { tag: "lead" | "booked" | "follow-up" | "spam" | null; booked: boolean };
+type Classification = {
+  tag: "lead" | "booked" | "follow-up" | "spam" | null;
+  booked: boolean;
+  estimated_value?: number | null;
+};
 
 async function classifyCall(opts: {
   summary: string;
@@ -40,7 +44,8 @@ Classify this call. Respond with a JSON tool call.
 - tag "lead": genuine prospective customer asking about services/pricing/availability but no booking confirmed.
 - tag "follow-up": existing customer or caller who needs a callback / unresolved question / message taken.
 - tag "spam": wrong number, robocall, solicitation, telemarketer, or nonsense.
-- booked: true only if an appointment was actually scheduled in this call.`;
+- booked: true only if an appointment was actually scheduled in this call.
+- estimated_value: the dollar price/quote of the service discussed in the call, as a number (no currency symbol). If multiple services, sum them. If no price was mentioned at all, return 0.`;
   try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -62,8 +67,9 @@ Classify this call. Respond with a JSON tool call.
                 properties: {
                   tag: { type: "string", enum: ["lead", "booked", "follow-up", "spam"] },
                   booked: { type: "boolean" },
+                  estimated_value: { type: "number", description: "Dollar value mentioned/quoted in the call. 0 if none." },
                 },
-                required: ["tag", "booked"],
+                  required: ["tag", "booked", "estimated_value"],
                 additionalProperties: false,
               },
             },
@@ -80,7 +86,11 @@ Classify this call. Respond with a JSON tool call.
     const args = json?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
     if (!args) return { tag: null, booked: false };
     const parsed = JSON.parse(args);
-    return { tag: parsed.tag ?? null, booked: Boolean(parsed.booked) };
+    return {
+      tag: parsed.tag ?? null,
+      booked: Boolean(parsed.booked),
+      estimated_value: typeof parsed.estimated_value === "number" ? parsed.estimated_value : null,
+    };
   } catch (e) {
     console.warn("classifyCall error", e);
     return { tag: null, booked: false };
