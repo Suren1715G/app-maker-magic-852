@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     }
 
     if (errorParam) {
-      return htmlResponse("Connection cancelled", `Google returned: ${errorParam}`, returnTo, false);
+      return redirectResponse(returnTo, "error", `Google returned: ${errorParam}`);
     }
     if (!code || !userId) throw new Error("Missing code or state");
 
@@ -81,11 +81,10 @@ Deno.serve(async (req) => {
           .eq("user_id", userId)
           .maybeSingle();
         if (existing && new Date(existing.expires_at).getTime() > Date.now() - 5 * 60_000) {
-          return htmlResponse(
-            "Google Calendar connected",
-            existing.google_email ? `Linked ${existing.google_email}` : "All set.",
+          return redirectResponse(
             returnTo,
-            true,
+            "success",
+            existing.google_email ? `Linked ${existing.google_email}` : "All set.",
           );
         }
       }
@@ -127,11 +126,10 @@ Deno.serve(async (req) => {
       finalRefresh = existing?.refresh_token;
     }
     if (!finalRefresh) {
-      return htmlResponse(
-        "Reconnect needed",
-        "Google didn't return a refresh token. Please revoke access at myaccount.google.com/permissions and try again.",
+      return redirectResponse(
         returnTo,
-        false,
+        "error",
+        "Google didn't return a refresh token. Please revoke access at myaccount.google.com/permissions and try again.",
       );
     }
 
@@ -150,10 +148,10 @@ Deno.serve(async (req) => {
       );
     if (upsertErr) throw new Error(`Failed to store tokens: ${upsertErr.message}`);
 
-    return htmlResponse("Google Calendar connected", googleEmail ? `Linked ${googleEmail}` : "All set.", returnTo, true);
+    return redirectResponse(returnTo, "success", googleEmail ? `Linked ${googleEmail}` : "All set.");
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("oauth-callback error", msg);
-    return htmlResponse("Connection failed", msg, returnTo, false);
+    return redirectResponse(returnTo, "error", msg);
   }
 });
