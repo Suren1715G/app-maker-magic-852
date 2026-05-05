@@ -366,32 +366,38 @@ export function LineBookingConfig({
       )}
 
       <div className="flex flex-wrap gap-1.5">
-        <Button size="sm" variant="outline" onClick={openGoogle} disabled={busy} className="h-7 text-xs">
-          <Link2 className="h-3 w-3 mr-1" /> Google
-        </Button>
-        {provider === "google" && (
-          <Button size="sm" variant="outline" onClick={openChangeCalendar} disabled={busy} className="h-7 text-xs">
-            <CalendarDays className="h-3 w-3 mr-1" /> Pick sub-calendar
-          </Button>
-        )}
-        <Button size="sm" variant="outline" onClick={openAcuity} disabled={busy} className="h-7 text-xs">
-          <Link2 className="h-3 w-3 mr-1" /> Acuity
-        </Button>
-        {admin && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={connectNewGoogleForLine}
-            disabled={busy}
-            className="h-7 text-xs"
-          >
-            <Link2 className="h-3 w-3 mr-1" /> Connect new Google
-          </Button>
-        )}
-        {provider !== "none" && (
-          <Button size="sm" variant="ghost" onClick={clear} disabled={busy} className="h-7 text-xs text-destructive hover:text-destructive">
-            <Trash2 className="h-3 w-3 mr-1" /> Clear
-          </Button>
+        {admin ? (
+          <>
+            <Button size="sm" variant="outline" onClick={openGoogle} disabled={busy} className="h-7 text-xs">
+              <Link2 className="h-3 w-3 mr-1" /> Google
+            </Button>
+            {provider === "google" && (
+              <Button size="sm" variant="outline" onClick={openChangeCalendar} disabled={busy} className="h-7 text-xs">
+                <CalendarDays className="h-3 w-3 mr-1" /> Pick sub-calendar
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={openAcuity} disabled={busy} className="h-7 text-xs">
+              <Link2 className="h-3 w-3 mr-1" /> Acuity
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={connectNewGoogleForLine}
+              disabled={busy}
+              className="h-7 text-xs"
+            >
+              <Link2 className="h-3 w-3 mr-1" /> Connect new Google
+            </Button>
+            {provider !== "none" && (
+              <Button size="sm" variant="ghost" onClick={clear} disabled={busy} className="h-7 text-xs text-destructive hover:text-destructive">
+                <Trash2 className="h-3 w-3 mr-1" /> Clear
+              </Button>
+            )}
+          </>
+        ) : (
+          <div className="text-[11px] text-muted-foreground">
+            Calendar setup is managed by your account admin. Contact support to change it.
+          </div>
         )}
       </div>
 
