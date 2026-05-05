@@ -17,7 +17,8 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace state={{ from: location }} />;
+    const next = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to={`/auth?next=${encodeURIComponent(next)}`} replace state={{ from: location }} />;
   }
 
   // Admins normally live in /master. Send them there unless they've explicitly
