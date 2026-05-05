@@ -53,6 +53,8 @@ Deno.serve(async (req) => {
 
     const redirectUri = `${supabaseUrl}/functions/v1/google-oauth-callback`;
 
+    const admin = createClient(supabaseUrl, serviceKey);
+
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -66,6 +68,23 @@ Deno.serve(async (req) => {
     });
     const tokenJson = await tokenRes.json();
     if (!tokenRes.ok) {
+      // If the code was already consumed (browser prefetch / double-fire) but
+      // we already have valid tokens for this user, treat it as success.
+      if (tokenJson?.error === "invalid_grant") {
+        const { data: existing } = await admin
+          .from("user_google_tokens")
+          .select("google_email, expires_at")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (existing && new Date(existing.expires_at).getTime() > Date.now() - 5 * 60_000) {
+          return htmlResponse(
+            "Google Calendar connected",
+            existing.google_email ? `Linked ${existing.google_email}` : "All set.",
+            returnTo,
+            true,
+          );
+        }
+      }
       throw new Error(`Token exchange failed: ${JSON.stringify(tokenJson)}`);
     }
 
@@ -91,7 +110,6 @@ Deno.serve(async (req) => {
       }
     } catch (_) { /* ignore */ }
 
-    const admin = createClient(supabaseUrl, serviceKey);
     const expiresAt = new Date(Date.now() + (expiresIn - 60) * 1000).toISOString();
 
     // If no refresh token returned, try to keep existing one
