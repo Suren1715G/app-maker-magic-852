@@ -14,7 +14,8 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Megaphone, Send, MessageSquare, Mail, Smartphone, Users, TrendingUp, CheckCircle2 } from "lucide-react";
+import { Megaphone, Send, MessageSquare, Mail, Smartphone, Users, TrendingUp, CheckCircle2, Bold, Italic, List, Link2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 type Channel = "sms" | "email";
@@ -66,7 +67,10 @@ const Campaigns = () => {
   const [schedule, setSchedule] = useState<Schedule>("now");
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [unsubscribeFooter, setUnsubscribeFooter] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -126,6 +130,14 @@ const Campaigns = () => {
   const reach = AUDIENCE_REACH[audience];
 
   const insertTag = (tag: string) => {
+    if (channel === "email") {
+      const el = editorRef.current;
+      if (!el) return;
+      el.focus();
+      document.execCommand("insertText", false, tag);
+      setMessage(el.innerHTML);
+      return;
+    }
     const el = textareaRef.current;
     if (!el) { setMessage((m) => m + tag); return; }
     const start = el.selectionStart ?? message.length;
@@ -137,6 +149,20 @@ const Campaigns = () => {
       const pos = start + tag.length;
       el.setSelectionRange(pos, pos);
     });
+  };
+
+  const exec = (cmd: string, value?: string) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, value);
+    if (editorRef.current) setMessage(editorRef.current.innerHTML);
+  };
+
+  const onChannelChange = (next: Channel) => {
+    if (next === channel) return;
+    // Reset message when switching to avoid HTML in SMS or plain text in email confusion
+    setMessage("");
+    if (editorRef.current) editorRef.current.innerHTML = "";
+    setChannel(next);
   };
 
   const openConfirm = () => {
@@ -203,7 +229,7 @@ const Campaigns = () => {
                 <div className="inline-flex rounded-lg border border-border/60 p-1 bg-secondary/30">
                   <button
                     type="button"
-                    onClick={() => setChannel("sms")}
+                    onClick={() => onChannelChange("sms")}
                     className={cn("flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors",
                       channel === "sms" ? "bg-background shadow-sm" : "text-muted-foreground")}
                   >
@@ -211,7 +237,7 @@ const Campaigns = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setChannel("email")}
+                    onClick={() => onChannelChange("email")}
                     className={cn("flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors",
                       channel === "email" ? "bg-background shadow-sm" : "text-muted-foreground")}
                   >
@@ -244,20 +270,70 @@ const Campaigns = () => {
                 </div>
               </div>
 
+              {channel === "email" && (
+                <div className="space-y-2">
+                  <Label>Subject line</Label>
+                  <Input
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder="A little something for you…"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>Message</Label>
-                  <span className={cn("text-xs", overLimit ? "text-destructive" : "text-muted-foreground")}>
-                    {counter} / 160
-                  </span>
+                  {channel === "sms" ? (
+                    <span className={cn("text-xs", overLimit ? "text-destructive" : "text-muted-foreground")}>
+                      {counter} / 160
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No character limit</span>
+                  )}
                 </div>
-                <Textarea
-                  ref={textareaRef}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Hi {name}! We miss you — come back for 20% off this week."
-                  rows={5}
-                />
+                {channel === "sms" ? (
+                  <Textarea
+                    ref={textareaRef}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Hi {name}! We miss you — come back for 20% off this week."
+                    rows={5}
+                  />
+                ) : (
+                  <div className="rounded-md border border-input bg-background overflow-hidden">
+                    <div className="flex items-center gap-1 border-b border-border/60 bg-secondary/40 p-1">
+                      <button type="button" onClick={() => exec("bold")}
+                        className="p-1.5 rounded hover:bg-background" title="Bold">
+                        <Bold className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button" onClick={() => exec("italic")}
+                        className="p-1.5 rounded hover:bg-background" title="Italic">
+                        <Italic className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button" onClick={() => exec("insertUnorderedList")}
+                        className="p-1.5 rounded hover:bg-background" title="Bullet list">
+                        <List className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button"
+                        onClick={() => {
+                          const url = window.prompt("Enter URL");
+                          if (url) exec("createLink", url);
+                        }}
+                        className="p-1.5 rounded hover:bg-background" title="Insert link">
+                        <Link2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div
+                      ref={editorRef}
+                      contentEditable
+                      onInput={(e) => setMessage((e.target as HTMLDivElement).innerHTML)}
+                      className="min-h-[140px] p-3 text-sm focus:outline-none [&_a]:text-primary [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5"
+                      data-placeholder="Write your email…"
+                      suppressContentEditableWarning
+                    />
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <div className="text-xs text-muted-foreground">Personalization tags</div>
                   <div className="flex flex-wrap gap-1.5">
@@ -274,6 +350,16 @@ const Campaigns = () => {
                   </div>
                 </div>
               </div>
+
+              {channel === "email" && (
+                <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+                  <div>
+                    <div className="text-sm font-medium">Unsubscribe footer</div>
+                    <div className="text-xs text-muted-foreground">Append "Reply STOP to unsubscribe" to the email.</div>
+                  </div>
+                  <Switch checked={unsubscribeFooter} onCheckedChange={setUnsubscribeFooter} />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Schedule</Label>
@@ -318,26 +404,44 @@ const Campaigns = () => {
             {/* Live phone preview */}
             <div className="lg:sticky lg:top-4 self-start">
               <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
-                <Smartphone className="h-3.5 w-3.5" /> Live preview
+                {channel === "sms" ? <Smartphone className="h-3.5 w-3.5" /> : <Mail className="h-3.5 w-3.5" />} Live preview
               </div>
-              <div className="mx-auto w-full max-w-[280px] aspect-[9/19] rounded-[2.25rem] border-[10px] border-foreground/80 bg-background shadow-xl overflow-hidden flex flex-col">
-                <div className="h-7 bg-foreground/80 flex items-center justify-center">
-                  <div className="h-1.5 w-16 rounded-full bg-background/30" />
-                </div>
-                <div className="flex-1 p-3 bg-secondary/40 flex flex-col gap-2 overflow-y-auto">
-                  <div className="text-[10px] text-muted-foreground text-center">
-                    {channel === "sms" ? "Today" : "Inbox preview"}
+              {channel === "sms" ? (
+                <div className="mx-auto w-full max-w-[280px] aspect-[9/19] rounded-[2.25rem] border-[10px] border-foreground/80 bg-background shadow-xl overflow-hidden flex flex-col">
+                  <div className="h-7 bg-foreground/80 flex items-center justify-center">
+                    <div className="h-1.5 w-16 rounded-full bg-background/30" />
                   </div>
-                  {channel === "email" && (
-                    <div className="text-[11px] font-semibold text-foreground px-1">
-                      {name || "(Your campaign name)"}
+                  <div className="flex-1 p-3 bg-secondary/40 flex flex-col gap-2 overflow-y-auto">
+                    <div className="text-[10px] text-muted-foreground text-center">Today</div>
+                    <div className="self-start max-w-[85%] rounded-2xl rounded-bl-sm bg-background border border-border/60 px-3 py-2 text-[12px] leading-snug whitespace-pre-wrap break-words">
+                      {message || <span className="text-muted-foreground">Your message will appear here…</span>}
                     </div>
-                  )}
-                  <div className="self-start max-w-[85%] rounded-2xl rounded-bl-sm bg-background border border-border/60 px-3 py-2 text-[12px] leading-snug whitespace-pre-wrap break-words">
-                    {message || <span className="text-muted-foreground">Your message will appear here…</span>}
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="mx-auto w-full rounded-xl border border-border/60 bg-card shadow-md overflow-hidden">
+                  <div className="border-b border-border/60 p-3 space-y-1 bg-secondary/30">
+                    <div className="text-[11px] text-muted-foreground">
+                      <span className="font-medium text-foreground">From:</span> YourBusiness &lt;noreply@yourbusiness.com&gt;
+                    </div>
+                    <div className="text-sm font-semibold truncate">
+                      {subject || <span className="text-muted-foreground font-normal">(Subject line)</span>}
+                    </div>
+                  </div>
+                  <div className="p-4 text-sm leading-relaxed [&_a]:text-primary [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5">
+                    {message ? (
+                      <div dangerouslySetInnerHTML={{ __html: message }} />
+                    ) : (
+                      <span className="text-muted-foreground">Your email body will appear here…</span>
+                    )}
+                    {unsubscribeFooter && (
+                      <div className="mt-6 pt-3 border-t border-border/60 text-[11px] text-muted-foreground">
+                        Reply STOP to unsubscribe
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </TabsContent>
