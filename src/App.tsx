@@ -27,8 +27,6 @@ import Referrals from "./pages/app/Referrals";
 import Support from "./pages/app/Support";
 import Assistant from "./pages/app/Assistant";
 import Notes from "./pages/app/Notes";
-import Inbox from "./pages/app/Inbox";
-import Campaigns from "./pages/app/Campaigns";
 import Privacy from "./pages/Privacy";
 import MasterOverview from "./pages/master/MasterOverview";
 import MasterCompanies from "./pages/master/MasterCompanies";
@@ -90,8 +88,6 @@ const App = () => (
               <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
               <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />
               <Route path="/notes" element={<ProtectedRoute><Notes /></ProtectedRoute>} />
-              <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
-              <Route path="/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
