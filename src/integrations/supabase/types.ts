@@ -126,6 +126,95 @@ export type Database = {
           },
         ]
       }
+      campaign_recipients: {
+        Row: {
+          campaign_id: string
+          company_id: string
+          created_at: string
+          email: string | null
+          id: string
+          name: string | null
+          phone: string | null
+          status: string
+        }
+        Insert: {
+          campaign_id: string
+          company_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          phone?: string | null
+          status?: string
+        }
+        Update: {
+          campaign_id?: string
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          phone?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_recipients_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          audience: string
+          channel: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          message_body: string
+          name: string
+          recipients_count: number
+          sent_at: string | null
+          status: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          audience?: string
+          channel?: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message_body?: string
+          name: string
+          recipients_count?: number
+          sent_at?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          audience?: string
+          channel?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message_body?: string
+          name?: string
+          recipients_count?: number
+          sent_at?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           acuity_api_key: string | null

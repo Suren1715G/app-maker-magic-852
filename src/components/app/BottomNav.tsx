@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Phone, CalendarDays, MessageSquare,
-  BarChart3, Bell, CreditCard, Gift, Bot, LifeBuoy, Settings, MoreHorizontal, LogOut, StickyNote, Sparkles, Shield,
+  BarChart3, Bell, CreditCard, Gift, Bot, LifeBuoy, Settings, MoreHorizontal, LogOut, StickyNote, Sparkles, Shield, Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -20,6 +20,7 @@ const primary = [
 
 const more = [
   { to: "/notes", label: "Notes", icon: StickyNote, hint: "Notes & reminders" },
+  { to: "/campaigns", label: "Campaigns", icon: Megaphone, hint: "SMS & email blasts" },
   { to: "/analytics", label: "Analytics", icon: BarChart3, hint: "Charts & ROI" },
   { to: "/notifications", label: "Notifications", icon: Bell, hint: "Alerts & prefs" },
   { to: "/assistant", label: "AI Analyst", icon: Bot, hint: "Ask your data" },
