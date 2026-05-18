@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, Mail } from "lucide-react";
+import { Helmet } from "react-helmet-async";
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="h-4 w-4">
@@ -58,9 +59,9 @@ const Auth = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <main className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
-      </div>
+      </main>
     );
   }
 
@@ -127,7 +128,16 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-5 py-10">
+    <main className="min-h-screen flex flex-col items-center justify-center px-5 py-10">
+      <Helmet>
+        <title>Sign in — SGS AI Receptionist</title>
+        <meta name="description" content="Sign in to your SGS AI Receptionist dashboard to view calls, bookings, and SMS confirmations in one place." />
+        <link rel="canonical" href="https://app-maker-magic-852.lovable.app/auth" />
+        <meta property="og:title" content="Sign in — SGS AI Receptionist" />
+        <meta property="og:description" content="Sign in to your SGS AI Receptionist dashboard." />
+        <meta property="og:url" content="https://app-maker-magic-852.lovable.app/auth" />
+        <meta property="og:image" content="https://app-maker-magic-852.lovable.app/icon-512.png" />
+      </Helmet>
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="inline-flex h-14 w-14 rounded-2xl glow-primary mb-4 overflow-hidden">
