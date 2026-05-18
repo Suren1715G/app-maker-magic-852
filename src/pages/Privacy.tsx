@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { Helmet } from "react-helmet-async";
 
 const thirdParties = [
   { name: "ElevenLabs", purpose: "AI voice call audio processing & storage" },
@@ -147,6 +148,15 @@ const sections = [
 export default function Privacy() {
   return (
     <main className="min-h-screen w-full">
+      <Helmet>
+        <title>Privacy Policy — SGS AI Receptionist</title>
+        <meta name="description" content="How SGS Reception Dashboard collects, uses, and protects information from its AI receptionist platform for service-based businesses." />
+        <link rel="canonical" href="https://app-maker-magic-852.lovable.app/privacy" />
+        <meta property="og:title" content="Privacy Policy — SGS AI Receptionist" />
+        <meta property="og:description" content="How SGS Reception Dashboard handles your data." />
+        <meta property="og:url" content="https://app-maker-magic-852.lovable.app/privacy" />
+        <meta property="og:image" content="https://app-maker-magic-852.lovable.app/icon-512.png" />
+      </Helmet>
       <div className="mx-auto w-full max-w-[720px] px-5 sm:px-8 py-12 md:py-16">
         <Link
           to="/"
