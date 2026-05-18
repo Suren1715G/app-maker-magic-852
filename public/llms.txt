@@ -1,0 +1,8 @@
+# SGS AI Receptionist
+
+> An AI receptionist dashboard for service-based businesses — live calls, bookings, and SMS confirmations in one always-on app.
+
+## Pages
+
+- [Sign in](/auth): Sign in or create an account for the SGS AI Receptionist dashboard.
+- [Privacy Policy](/privacy): How SGS Reception Dashboard collects, uses, and protects customer data.
